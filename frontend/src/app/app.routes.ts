@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { LoginComponent } from './features/auth/login.component';
 import { StudentOverviewComponent } from './features/student-overview/student-overview.component';
+import { AgreementsListComponent } from './features/agreements/agreements-list.component';
 import { AppShellComponent } from './shared/components/app-shell/app-shell.component';
 import { authGuard } from './core/guards/auth.guard';
 
@@ -25,27 +26,27 @@ export const routes: Routes = [
       },
       {
         path: 'tutoring',
-        component: StudentOverviewComponent // Sprint 2 expansion
+        component: StudentOverviewComponent
       },
       {
         path: 'agreements',
-        component: StudentOverviewComponent // Sprint 2 expansion
+        component: AgreementsListComponent
       },
       {
         path: 'thesis',
-        component: StudentOverviewComponent // Sprint 3 expansion
+        component: StudentOverviewComponent // Sprint 3
       },
       {
         path: 'evidence',
-        component: StudentOverviewComponent // Sprint 3 expansion
+        component: StudentOverviewComponent // Sprint 3
       },
       {
         path: 'timeline',
-        component: StudentOverviewComponent // Sprint 4 expansion
+        component: StudentOverviewComponent // Sprint 4
       },
       {
         path: 'reports',
-        component: StudentOverviewComponent // Sprint 5 expansion
+        component: StudentOverviewComponent // Sprint 5
       }
     ]
   },

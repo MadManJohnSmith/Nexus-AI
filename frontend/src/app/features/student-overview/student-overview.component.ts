@@ -2,16 +2,22 @@ import { Component, OnInit, inject, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { StudentService } from '../../core/services/student.service';
+import { TutoringService } from '../../core/services/tutoring.service';
+import { AgreementService } from '../../core/services/agreement.service';
 import { AuthService } from '../../core/services/auth.service';
-import { Student, Semester, AcademicCommitteeMember } from '../../core/models/student.models';
+import { Student } from '../../core/models/student.models';
+import { TutoringSession } from '../../core/models/tutoring.models';
+import { Agreement } from '../../core/models/agreement.models';
 import { PillBadgeComponent } from '../../shared/components/pill-badge/pill-badge.component';
+import { TutoringModalComponent } from '../tutoring/tutoring-modal.component';
+import { AgreementDrawerComponent } from '../agreements/agreement-drawer.component';
 
-export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
+export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis' | 'evidencias';
 
 @Component({
   selector: 'nexus-student-overview',
   standalone: true,
-  imports: [CommonModule, FormsModule, PillBadgeComponent],
+  imports: [CommonModule, FormsModule, PillBadgeComponent, TutoringModalComponent, AgreementDrawerComponent],
   template: `
     <div class="expediente-container">
       <!-- Loading State -->
@@ -51,29 +57,20 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
                   <span class="meta-label">Semestre Actual:</span>
                   <span class="semester-pill">Semestre {{ currentStudent()!.semestreActual }}</span>
                 </span>
-                <span class="meta-divider">•</span>
-                <span class="meta-item">
-                  <span class="meta-label">Ingreso:</span>
-                  <span>{{ currentStudent()!.fechaIngreso }}</span>
-                </span>
               </div>
             </div>
           </div>
 
-          <!-- Quick Stats Cards in Header -->
-          <div class="header-stats">
-            <div class="stat-box">
-              <span class="stat-number">{{ currentStudent()!.totalSemestres }} / 6</span>
-              <span class="stat-label">Semestres Registrados</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-number">{{ committeeList().length }}</span>
-              <span class="stat-label">Miembros en Comité</span>
-            </div>
-            <div class="stat-box">
-              <span class="stat-number">100%</span>
-              <span class="stat-label">Seguimiento Regular</span>
-            </div>
+          <!-- Quick Actions in Header -->
+          <div class="header-actions">
+            @if (authService.isCoordinator() || authService.isAdvisor()) {
+              <button type="button" class="btn-action-primary" (click)="showTutoringModal = true">
+                <span class="btn-icon">📘</span> + Registrar Tutoría
+              </button>
+              <button type="button" class="btn-action-secondary" (click)="openCreateAgreementDrawer()">
+                <span class="btn-icon">📝</span> + Nuevo Acuerdo
+              </button>
+            }
           </div>
         </header>
 
@@ -86,6 +83,22 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
             (click)="selectTab('resumen')">
             <span class="tab-icon">📋</span>
             <span>Resumen General</span>
+          </button>
+          <button 
+            type="button" 
+            class="tab-btn" 
+            [class.active]="activeTab() === 'tutorias'"
+            (click)="selectTab('tutorias')">
+            <span class="tab-icon">📘</span>
+            <span>Sesiones de Tutoría ({{ tutoringSessions().length }})</span>
+          </button>
+          <button 
+            type="button" 
+            class="tab-btn" 
+            [class.active]="activeTab() === 'acuerdos'"
+            (click)="selectTab('acuerdos')">
+            <span class="tab-icon">📝</span>
+            <span>Acuerdos y Compromisos ({{ agreementsList().length }})</span>
           </button>
           <button 
             type="button" 
@@ -109,7 +122,7 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
             [class.active]="activeTab() === 'evidencias'"
             (click)="selectTab('evidencias')">
             <span class="tab-icon">📎</span>
-            <span>Evidencias y Productos</span>
+            <span>Evidencias</span>
           </button>
         </div>
 
@@ -118,7 +131,7 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
           <!-- Columna Principal 70% -->
           <div class="main-column-70">
             @if (activeTab() === 'resumen') {
-              <!-- Sección de Resumen General -->
+              <!-- Resumen Trayectoria -->
               <section class="content-card">
                 <div class="card-header-row">
                   <h3 class="card-title">Trayectoria y Avances del Posgrado</h3>
@@ -142,11 +155,11 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
                 </div>
               </section>
 
-              <!-- Módulo de Acuerdos y Compromisos Recientes -->
+              <!-- Módulo de Acuerdos Activos -->
               <section class="content-card">
                 <div class="card-header-row">
-                  <h3 class="card-title">Compromisos y Acuerdos de Tutoría</h3>
-                  <span class="card-action-link">Ver todos los acuerdos (Sprint 2)</span>
+                  <h3 class="card-title">Compromisos Recientes del Estudiante</h3>
+                  <span class="card-action-link" (click)="selectTab('acuerdos')">Ver todos los acuerdos ➔</span>
                 </div>
                 <div class="card-body">
                   <div class="agreements-table-wrapper">
@@ -154,30 +167,126 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
                       <thead>
                         <tr>
                           <th>Compromiso / Tarea</th>
-                          <th>Semestre</th>
+                          <th>Responsable</th>
                           <th>Fecha Límite</th>
                           <th>Estado</th>
                         </tr>
                       </thead>
                       <tbody>
+                        @for (agr of agreementsList(); track agr.id) {
+                          <tr class="clickable-tr" (click)="openEditAgreementDrawer(agr)">
+                            <td><strong>{{ agr.descripcion }}</strong></td>
+                            <td>{{ agr.responsableNombre }}</td>
+                            <td [class.overdue-date]="agr.isOverdue">{{ agr.fechaLimite }}</td>
+                            <td><nexus-pill-badge [variant]="agr.estado"></nexus-pill-badge></td>
+                          </tr>
+                        } @empty {
+                          <tr>
+                            <td colspan="4" class="empty-hint">No hay acuerdos registrados aún.</td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </section>
+            }
+
+            @if (activeTab() === 'tutorias') {
+              <!-- Listado de Tutorías -->
+              <section class="content-card">
+                <div class="card-header-row">
+                  <h3 class="card-title">Historial de Sesiones de Tutoría</h3>
+                  @if (authService.isCoordinator() || authService.isAdvisor()) {
+                    <button type="button" class="btn-sm-primary" (click)="showTutoringModal = true">
+                      + Nueva Sesión
+                    </button>
+                  }
+                </div>
+                <div class="card-body">
+                  <div class="sessions-timeline">
+                    @for (s of tutoringSessions(); track s.id) {
+                      <div class="session-card">
+                        <div class="session-header">
+                          <div class="session-badge-date">
+                            <span class="session-date-icon">📅</span>
+                            <strong>{{ s.fechaSesion }}</strong>
+                            <span class="modalidad-pill">{{ s.modalidad }}</span>
+                            <span class="sem-tag">Semestre {{ s.semesterNumero }}</span>
+                          </div>
+                          <span class="session-author">Registrado por: {{ s.createdByNombre || 'Asesor' }}</span>
+                        </div>
+                        <p class="session-summary">{{ s.resumenGeneral }}</p>
+
+                        @if (s.observations && s.observations.length > 0) {
+                          <div class="session-observations">
+                            <div class="obs-title">Observaciones de Avance:</div>
+                            @for (obs of s.observations; track obs.id) {
+                              <div class="obs-item">
+                                <span class="obs-bullet">•</span>
+                                <div>
+                                  <strong>{{ obs.temaRevisado }}:</strong> {{ obs.observacionesDetalladas }}
+                                </div>
+                              </div>
+                            }
+                          </div>
+                        }
+
+                        @if (s.proximaReunionFecha) {
+                          <div class="next-meeting-box">
+                            <span class="meeting-icon">⏰</span>
+                            <span>Próxima reunión programada para el <strong>{{ s.proximaReunionFecha }}</strong> ({{ s.proximaReunionNotas || 'Sin notas' }})</span>
+                          </div>
+                        }
+                      </div>
+                    } @empty {
+                      <div class="empty-state">
+                        <p>No se han registrado sesiones de tutoría en el expediente.</p>
+                      </div>
+                    }
+                  </div>
+                </div>
+              </section>
+            }
+
+            @if (activeTab() === 'acuerdos') {
+              <section class="content-card">
+                <div class="card-header-row">
+                  <h3 class="card-title">Todos los Acuerdos del Expediente</h3>
+                  @if (authService.isCoordinator() || authService.isAdvisor()) {
+                    <button type="button" class="btn-sm-primary" (click)="openCreateAgreementDrawer()">
+                      + Nuevo Acuerdo
+                    </button>
+                  }
+                </div>
+                <div class="card-body">
+                  <div class="agreements-table-wrapper">
+                    <table class="nexus-table">
+                      <thead>
                         <tr>
-                          <td>Entrega de Estado del Arte y Protocolo de Tesis</td>
-                          <td>Semestre 1</td>
-                          <td>2024-06-30</td>
-                          <td><nexus-pill-badge variant="CONCLUIDO" label="Concluido"></nexus-pill-badge></td>
+                          <th>ID</th>
+                          <th>Compromiso</th>
+                          <th>Responsable</th>
+                          <th>Fecha Límite</th>
+                          <th>Estado</th>
+                          <th>Acción</th>
                         </tr>
-                        <tr>
-                          <td>Borrador de Artículo para Revista Indexada JCR</td>
-                          <td>Semestre 2</td>
-                          <td>2024-11-20</td>
-                          <td><nexus-pill-badge variant="EN_PROCESO" label="En Proceso"></nexus-pill-badge></td>
-                        </tr>
-                        <tr>
-                          <td>Revisión de Avance Capítulo 3 con Comité Tutoral</td>
-                          <td>Semestre 2</td>
-                          <td>2024-12-10</td>
-                          <td><nexus-pill-badge variant="PENDIENTE" label="Pendiente"></nexus-pill-badge></td>
-                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (agr of agreementsList(); track agr.id) {
+                          <tr class="clickable-tr" (click)="openEditAgreementDrawer(agr)">
+                            <td>#{{ agr.id }}</td>
+                            <td><strong>{{ agr.descripcion }}</strong></td>
+                            <td>{{ agr.responsableNombre }}</td>
+                            <td [class.overdue-date]="agr.isOverdue">{{ agr.fechaLimite }}</td>
+                            <td><nexus-pill-badge [variant]="agr.estado"></nexus-pill-badge></td>
+                            <td><button type="button" class="btn-quick-edit">Gestionar</button></td>
+                          </tr>
+                        } @empty {
+                          <tr>
+                            <td colspan="6" class="empty-hint">Sin acuerdos registrados.</td>
+                          </tr>
+                        }
                       </tbody>
                     </table>
                   </div>
@@ -229,14 +338,9 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
                           </nexus-pill-badge>
                         </div>
                       </div>
-                      <div class="activities-placeholder">
-                        <p class="placeholder-text">
-                          📘 Las tutorías, compromisos y bitácoras asociadas a este semestre se gestionarán en los módulos especializados.
-                        </p>
-                      </div>
                     } @else {
                       <div class="empty-semester-state">
-                        <p>El Semestre {{ selectedSemesterNum() }} aún no ha sido dado de alta en la trayectoria del estudiante.</p>
+                        <p>El Semestre {{ selectedSemesterNum() }} aún no ha sido dado de alta.</p>
                       </div>
                     }
                   </div>
@@ -252,24 +356,8 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
                 </div>
                 <div class="card-body">
                   <p class="section-desc">
-                    Título Tentativo: <strong>"Arquitectura de Agentes Inteligentes Autónomos para la Trazabilidad Longitudinal en Posgrados de Alto Impacto"</strong>
+                    Título: <strong>"Arquitectura de Agentes Inteligentes Autónomos para la Trazabilidad Longitudinal en Posgrados de Alto Impacto"</strong>
                   </p>
-                  <div class="thesis-milestones">
-                    <div class="milestone-item completed">
-                      <span class="milestone-icon">✓</span>
-                      <div>
-                        <strong>Definición del Problema y Justificación</strong>
-                        <p>Validado por Asesor Principal en Semestre 1</p>
-                      </div>
-                    </div>
-                    <div class="milestone-item current">
-                      <span class="milestone-icon">⚡</span>
-                      <div>
-                        <strong>Desarrollo del Marco Teórico y Algoritmos Base</strong>
-                        <p>En revisión continua en Semestre 2</p>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </section>
             }
@@ -277,32 +365,48 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
             @if (activeTab() === 'evidencias') {
               <section class="content-card">
                 <div class="card-header-row">
-                  <h3 class="card-title">Repositorio de Evidencias y Difusión Científica</h3>
+                  <h3 class="card-title">Repositorio de Evidencias</h3>
                 </div>
                 <div class="card-body">
-                  <div class="evidence-list">
-                    <div class="evidence-item">
-                      <span class="evidence-icon">📄</span>
-                      <div class="evidence-info">
-                        <strong>Protocolo_Doctoral_Aprobado_2024.pdf</strong>
-                        <span class="evidence-sub">Cargado el 2024-02-10 • Semestre 1</span>
-                      </div>
-                      <nexus-pill-badge variant="CONCLUIDO" label="Validado"></nexus-pill-badge>
-                    </div>
-                  </div>
+                  <p class="empty-hint">El módulo especializado de evidencias se completará en el Sprint 3.</p>
                 </div>
               </section>
             }
           </div>
 
-          <!-- Columna Lateral 30% (Ficha del Comité Tutoral) -->
+          <!-- Columna Lateral 30% (Comité Tutoral y Widget de Acuerdos) -->
           <aside class="sidebar-column-30">
+            <!-- Widget de Acuerdos con Contador y Alertas -->
+            <div class="widget-card widget-agreements">
+              <div class="widget-header">
+                <h3 class="widget-title">Resumen de Compromisos</h3>
+                @if (overdueCount() > 0) {
+                  <span class="badge-alert-overdue">⚠️ {{ overdueCount() }} Vencidos</span>
+                }
+              </div>
+              <div class="widget-stats-row">
+                <div class="widget-stat">
+                  <span class="w-num">{{ pendingCount() }}</span>
+                  <span class="w-lbl">Pendientes</span>
+                </div>
+                <div class="widget-stat">
+                  <span class="w-num">{{ inProgressCount() }}</span>
+                  <span class="w-lbl">En Proceso</span>
+                </div>
+                <div class="widget-stat">
+                  <span class="w-num">{{ completedCount() }}</span>
+                  <span class="w-lbl">Concluidos</span>
+                </div>
+              </div>
+              <button type="button" class="btn-widget-action" (click)="openCreateAgreementDrawer()">
+                + Asignar Acuerdo Rápido
+              </button>
+            </div>
+
+            <!-- Ficha del Comité Tutoral -->
             <div class="committee-card">
               <div class="committee-card-header">
                 <h3 class="committee-title">Comité Tutoral y Asesores</h3>
-                @if (authService.isCoordinator()) {
-                  <button type="button" class="btn-icon-add" (click)="showAddMemberModal = true" title="Asignar Asesor">+ Asignar</button>
-                }
               </div>
 
               <div class="committee-members-list">
@@ -318,30 +422,31 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
                         <nexus-pill-badge [variant]="member.rolComite" [label]="member.rolComiteDisplay"></nexus-pill-badge>
                       </div>
                     </div>
-                    @if (authService.isCoordinator()) {
-                      <button 
-                        type="button" 
-                        class="btn-remove-member" 
-                        (click)="removeMember(member.id)" 
-                        title="Remover miembro">
-                        ✕
-                      </button>
-                    }
-                  </div>
-                } @empty {
-                  <div class="empty-committee">
-                    <p>No se han asignado miembros al comité académico aún.</p>
                   </div>
                 }
-              </div>
-
-              <div class="committee-footer-info">
-                <span class="info-icon">ℹ️</span>
-                <span class="info-text">Los asesores asignados tienen permisos de registro de tutorías y seguimiento.</span>
               </div>
             </div>
           </aside>
         </div>
+      }
+
+      <!-- Modal de Registro de Tutoría (2 Columnas) -->
+      @if (showTutoringModal) {
+        <nexus-tutoring-modal
+          [student]="currentStudent()"
+          (close)="showTutoringModal = false"
+          (sessionSaved)="onTutoringSaved()">
+        </nexus-tutoring-modal>
+      }
+
+      <!-- Drawer Lateral Derecho (400px) -->
+      @if (showAgreementDrawer) {
+        <nexus-agreement-drawer
+          [student]="currentStudent()"
+          [selectedAgreement]="selectedAgreementToEdit"
+          (close)="showAgreementDrawer = false"
+          (agreementUpdated)="onAgreementUpdated()">
+        </nexus-agreement-drawer>
       }
     </div>
   `,
@@ -375,7 +480,6 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
       to { transform: rotate(360deg); }
     }
 
-    /* Student Header Card */
     .student-header-card {
       background-color: #FFFFFF;
       border-radius: var(--radius-lg);
@@ -455,34 +559,47 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
       font-size: 0.75rem;
     }
 
-    .header-stats {
+    .header-actions {
       display: flex;
-      gap: 16px;
+      gap: 12px;
     }
 
-    .stat-box {
-      background-color: #F8F9FC;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: 12px 18px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-width: 130px;
-    }
-
-    .stat-number {
-      font-size: 1.25rem;
-      font-weight: 800;
-      color: var(--color-emphasis);
-    }
-
-    .stat-label {
-      font-size: 0.7rem;
-      color: var(--color-text-muted);
+    .btn-action-primary {
+      padding: 9px 16px;
+      background-color: var(--color-primary);
+      color: #FFFFFF;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
       font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.02em;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background-color 0.2s;
+    }
+
+    .btn-action-primary:hover {
+      background-color: var(--color-primary-hover);
+    }
+
+    .btn-action-secondary {
+      padding: 9px 16px;
+      background-color: #FFFFFF;
+      color: var(--color-primary);
+      border: 1px solid var(--color-primary);
+      border-radius: var(--radius-sm);
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+
+    .btn-action-secondary:hover {
+      background-color: var(--color-primary-light);
     }
 
     /* Tabs Bar */
@@ -509,12 +626,7 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
       position: relative;
     }
 
-    .tab-btn:hover {
-      color: var(--color-primary);
-      background-color: #FFFFFF;
-    }
-
-    .tab-btn.active {
+    .tab-btn:hover, .tab-btn.active {
       color: var(--color-primary);
       background-color: #FFFFFF;
     }
@@ -530,7 +642,7 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
       border-radius: 3px 3px 0 0;
     }
 
-    /* Grid 70/30 */
+    /* Modular Grid 70/30 */
     .modular-grid {
       display: grid;
       grid-template-columns: 7fr 3fr;
@@ -546,6 +658,7 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
     .sidebar-column-30 {
       display: flex;
       flex-direction: column;
+      gap: 20px;
     }
 
     .content-card {
@@ -603,11 +716,6 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
       border-bottom: 1px dashed var(--color-border);
     }
 
-    .kv-item:last-child {
-      border-bottom: none;
-      padding-bottom: 0;
-    }
-
     .kv-label {
       font-size: 0.85rem;
       color: var(--color-text-muted);
@@ -620,15 +728,11 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
       color: var(--color-text-main);
     }
 
-    .kv-value.primary-highlight {
+    .primary-highlight {
       color: var(--color-primary);
     }
 
     /* Agreements Table */
-    .agreements-table-wrapper {
-      overflow-x: auto;
-    }
-
     .nexus-table {
       width: 100%;
       border-collapse: collapse;
@@ -650,87 +754,204 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
       color: var(--color-text-main);
     }
 
-    /* Stepper Semestres */
-    .semester-stepper {
-      display: grid;
-      grid-template-columns: repeat(6, 1fr);
-      gap: 8px;
-      margin-bottom: 20px;
+    .clickable-tr {
+      cursor: pointer;
     }
 
-    .stepper-step {
+    .clickable-tr:hover {
+      background-color: #F8FAFC;
+    }
+
+    .overdue-date {
+      color: var(--color-danger);
+      font-weight: 700;
+    }
+
+    .btn-quick-edit {
+      background: transparent;
+      border: 1px solid var(--color-border);
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 0.725rem;
+      color: var(--color-primary);
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Sessions Timeline */
+    .sessions-timeline {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      padding: 12px 6px;
+      gap: 16px;
+    }
+
+    .session-card {
+      background-color: #FAFAFB;
       border: 1px solid var(--color-border);
       border-radius: var(--radius-sm);
-      background-color: #FAFAFB;
-      cursor: pointer;
-      transition: all 0.2s;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
     }
 
-    .stepper-step.active {
-      border-color: var(--color-primary);
+    .session-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .session-badge-date {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+    }
+
+    .modalidad-pill {
+      background-color: #F2F4F7;
+      color: var(--color-text-muted);
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .sem-tag {
       background-color: var(--color-primary-light);
+      color: var(--color-primary);
+      font-size: 0.7rem;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-weight: 600;
     }
 
-    .step-num {
-      font-size: 1.1rem;
+    .session-author {
+      font-size: 0.75rem;
+      color: var(--color-text-light);
+    }
+
+    .session-summary {
+      font-size: 0.85rem;
+      color: var(--color-text-main);
+      line-height: 1.4;
+    }
+
+    .session-observations {
+      background-color: #FFFFFF;
+      border-radius: 6px;
+      padding: 10px 14px;
+      border: 1px solid var(--color-border);
+      font-size: 0.8rem;
+    }
+
+    .obs-title {
+      font-weight: 700;
+      color: var(--color-emphasis);
+      margin-bottom: 6px;
+    }
+
+    .obs-item {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .next-meeting-box {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background-color: #F6FCFE;
+      border: 1px solid #57949D;
+      color: #155E75;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 0.775rem;
+    }
+
+    /* Widget de Acuerdos Lateral */
+    .widget-card {
+      background-color: #FFFFFF;
+      border-radius: var(--radius-md);
+      border: 1px solid var(--color-border);
+      box-shadow: var(--shadow-sm);
+      padding: 20px;
+    }
+
+    .widget-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+    }
+
+    .widget-title {
+      font-size: 0.95rem;
       font-weight: 700;
       color: var(--color-text-main);
     }
 
-    .stepper-step.active .step-num {
-      color: var(--color-primary);
-    }
-
-    .step-title {
+    .badge-alert-overdue {
+      background-color: #F8F1FF;
+      color: #A14D98;
+      border: 1px solid #A14D98;
+      padding: 2px 8px;
+      border-radius: 9999px;
       font-size: 0.7rem;
-      font-weight: 600;
-      color: var(--color-text-muted);
+      font-weight: 700;
+      animation: pulse 2s infinite;
     }
 
-    .step-status {
-      font-size: 0.65rem;
-      color: var(--color-text-light);
-      margin-top: 4px;
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.7; }
     }
 
-    .semester-detail-panel {
+    .widget-stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .widget-stat {
       background-color: #F8F9FC;
-      border-radius: var(--radius-sm);
-      padding: 16px;
       border: 1px solid var(--color-border);
-    }
-
-    .semester-meta-info {
-      display: flex;
-      gap: 32px;
-      margin-bottom: 12px;
-    }
-
-    .meta-block {
+      border-radius: var(--radius-sm);
+      padding: 10px 6px;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      align-items: center;
     }
 
-    .meta-lbl {
-      font-size: 0.75rem;
+    .w-num {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--color-emphasis);
+    }
+
+    .w-lbl {
+      font-size: 0.65rem;
       color: var(--color-text-muted);
       font-weight: 600;
     }
 
-    .meta-val {
-      font-size: 0.85rem;
+    .btn-widget-action {
+      width: 100%;
+      padding: 8px;
+      background-color: var(--color-primary-light);
+      color: var(--color-primary);
+      border: 1px solid var(--color-primary);
+      border-radius: var(--radius-sm);
+      font-size: 0.8rem;
       font-weight: 600;
-      color: var(--color-text-main);
+      cursor: pointer;
+      transition: all 0.2s;
     }
 
-    .placeholder-text {
-      font-size: 0.825rem;
-      color: var(--color-text-muted);
+    .btn-widget-action:hover {
+      background-color: var(--color-primary);
+      color: #FFFFFF;
     }
 
     /* Committee Sidebar Card */
@@ -743,9 +964,6 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
     }
 
     .committee-card-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
       margin-bottom: 16px;
       padding-bottom: 12px;
       border-bottom: 1px solid var(--color-border);
@@ -755,17 +973,6 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
       font-size: 0.95rem;
       font-weight: 700;
       color: var(--color-text-main);
-    }
-
-    .btn-icon-add {
-      background-color: var(--color-primary-light);
-      color: var(--color-primary);
-      border: none;
-      padding: 4px 10px;
-      border-radius: 4px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      cursor: pointer;
     }
 
     .committee-members-list {
@@ -822,28 +1029,87 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
       text-overflow: ellipsis;
     }
 
-    .btn-remove-member {
-      background: transparent;
-      border: none;
-      color: var(--color-text-light);
-      cursor: pointer;
-      font-size: 0.85rem;
-      padding: 4px 8px;
-    }
-
-    .btn-remove-member:hover {
-      color: var(--color-danger);
-    }
-
-    .committee-footer-info {
-      display: flex;
-      align-items: flex-start;
+    .semester-stepper {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
       gap: 8px;
-      margin-top: 16px;
-      padding-top: 12px;
-      border-top: 1px dashed var(--color-border);
-      font-size: 0.725rem;
+      margin-bottom: 20px;
+    }
+
+    .stepper-step {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 6px;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background-color: #FAFAFB;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .stepper-step.active {
+      border-color: var(--color-primary);
+      background-color: var(--color-primary-light);
+    }
+
+    .step-num {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--color-text-main);
+    }
+
+    .stepper-step.active .step-num {
+      color: var(--color-primary);
+    }
+
+    .step-title {
+      font-size: 0.7rem;
+      font-weight: 600;
       color: var(--color-text-muted);
+    }
+
+    .step-status {
+      font-size: 0.65rem;
+      color: var(--color-text-light);
+      margin-top: 4px;
+    }
+
+    .semester-detail-panel {
+      background-color: #F8F9FC;
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      border: 1px solid var(--color-border);
+    }
+
+    .semester-meta-info {
+      display: flex;
+      gap: 32px;
+    }
+
+    .meta-block {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .meta-lbl {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      font-weight: 600;
+    }
+
+    .meta-val {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--color-text-main);
+    }
+
+    .empty-hint, .empty-state, .empty-semester-state {
+      font-size: 0.825rem;
+      color: var(--color-text-muted);
+      text-align: center;
+      padding: 20px;
     }
 
     .btn-sm-primary {
@@ -860,13 +1126,21 @@ export type TabType = 'resumen' | 'semestres' | 'tesis' | 'evidencias';
 })
 export class StudentOverviewComponent implements OnInit {
   private studentService = inject(StudentService);
+  private tutoringService = inject(TutoringService);
+  private agreementService = inject(AgreementService);
   public authService = inject(AuthService);
 
   public isLoading = signal<boolean>(true);
   public currentStudent = signal<Student | null>(null);
+  public tutoringSessions = signal<TutoringSession[]>([]);
+  public agreementsList = signal<Agreement[]>([]);
   public activeTab = signal<TabType>('resumen');
   public selectedSemesterNum = signal<number>(1);
-  public showAddMemberModal = false;
+
+  // Modals & Drawers State
+  public showTutoringModal = false;
+  public showAgreementDrawer = false;
+  public selectedAgreementToEdit: Agreement | null = null;
 
   public committeeList = computed(() => {
     return this.currentStudent()?.academicCommittee || [];
@@ -877,6 +1151,11 @@ export class StudentOverviewComponent implements OnInit {
     return sems.find(s => s.numero === this.selectedSemesterNum()) || null;
   });
 
+  public pendingCount = computed(() => this.agreementsList().filter(a => a.estado === 'PENDIENTE').length);
+  public inProgressCount = computed(() => this.agreementsList().filter(a => a.estado === 'EN_PROCESO').length);
+  public completedCount = computed(() => this.agreementsList().filter(a => a.estado === 'CONCLUIDO').length);
+  public overdueCount = computed(() => this.agreementsList().filter(a => a.isOverdue || a.estado === 'VENCIDO').length);
+
   ngOnInit(): void {
     this.loadExpediente();
   }
@@ -886,68 +1165,37 @@ export class StudentOverviewComponent implements OnInit {
     this.studentService.getStudents(1, 1).subscribe({
       next: (res) => {
         if (res.results.length > 0) {
-          const firstStudent = res.results[0];
-          // Cargar detalle completo
-          this.studentService.getStudentById(firstStudent.id).subscribe({
+          const studentId = res.results[0].id;
+          this.studentService.getStudentById(studentId).subscribe({
             next: (detailed) => {
               this.currentStudent.set(detailed);
               this.selectedSemesterNum.set(detailed.semestreActual);
-              this.isLoading.set(false);
+              this.loadTutoringAndAgreements(studentId);
             },
             error: () => {
-              this.currentStudent.set(firstStudent);
-              this.isLoading.set(false);
+              this.currentStudent.set(res.results[0]);
+              this.loadTutoringAndAgreements(studentId);
             }
           });
         } else {
-          // Fallback dummy for fresh installation demo
-          this.currentStudent.set({
-            id: 1,
-            matricula: 'DOC-2024-001',
-            nombreCompleto: 'Alan Turing',
-            email: 'alan.turing@posgrado.edu',
-            programaDoctoral: 'Doctorado en Ciencias de la Computación',
-            fechaIngreso: '2024-01-15',
-            cohorte: '2024-A',
-            estatusActivo: true,
-            semestreActual: 2,
-            asesorPrincipal: 'Dr. Alonzo Church',
-            coasesor: 'Dra. Ada Lovelace',
-            totalSemestres: 2,
-            semesters: [
-              { id: 1, student: 1, numero: 1, fechaInicio: '2024-01-15', fechaFin: '2024-06-30', isActive: false },
-              { id: 2, student: 1, numero: 2, fechaInicio: '2024-08-01', fechaFin: '2024-12-15', isActive: true }
-            ],
-            academicCommittee: [
-              {
-                id: 1,
-                student: 1,
-                user: 2,
-                userNombre: 'Dr. Alonzo Church',
-                userEmail: 'church@posgrado.edu',
-                userRole: 'ASESOR',
-                rolComite: 'ASESOR_PRINCIPAL',
-                rolComiteDisplay: 'Asesor Principal',
-                fechaAsignacion: '2024-01-15',
-                isActive: true
-              },
-              {
-                id: 2,
-                student: 1,
-                user: 3,
-                userNombre: 'Dra. Ada Lovelace',
-                userEmail: 'ada@posgrado.edu',
-                userRole: 'ASESOR',
-                rolComite: 'COASESOR',
-                rolComiteDisplay: 'Coasesor',
-                fechaAsignacion: '2024-01-20',
-                isActive: true
-              }
-            ]
-          });
-          this.selectedSemesterNum.set(2);
           this.isLoading.set(false);
         }
+      },
+      error: () => {
+        this.isLoading.set(false);
+      }
+    });
+  }
+
+  public loadTutoringAndAgreements(studentId: number): void {
+    this.tutoringService.getSessions(studentId).subscribe({
+      next: (sessRes) => this.tutoringSessions.set(sessRes.results)
+    });
+
+    this.agreementService.getAgreements({ student: studentId }).subscribe({
+      next: (agrRes) => {
+        this.agreementsList.set(agrRes.results);
+        this.isLoading.set(false);
       },
       error: () => {
         this.isLoading.set(false);
@@ -975,17 +1223,26 @@ export class StudentOverviewComponent implements OnInit {
     return (parts[0][0] + parts[1][0]).toUpperCase();
   }
 
-  public removeMember(memberId: number): void {
-    const student = this.currentStudent();
-    if (!student) return;
+  public openCreateAgreementDrawer(): void {
+    this.selectedAgreementToEdit = null;
+    this.showAgreementDrawer = true;
+  }
 
-    if (confirm('¿Está seguro de remover este miembro del comité tutoral?')) {
-      this.studentService.removeCommitteeMember(student.id, memberId).subscribe({
-        next: () => {
-          this.loadExpediente();
-        }
-      });
-    }
+  public openEditAgreementDrawer(agr: Agreement): void {
+    this.selectedAgreementToEdit = agr;
+    this.showAgreementDrawer = true;
+  }
+
+  public onTutoringSaved(): void {
+    this.showTutoringModal = false;
+    const student = this.currentStudent();
+    if (student) this.loadTutoringAndAgreements(student.id);
+  }
+
+  public onAgreementUpdated(): void {
+    this.showAgreementDrawer = false;
+    const student = this.currentStudent();
+    if (student) this.loadTutoringAndAgreements(student.id);
   }
 
   public openSemesterModal(): void {
@@ -1005,9 +1262,7 @@ export class StudentOverviewComponent implements OnInit {
       fechaFin: '2025-06-30',
       isActive: true
     }).subscribe({
-      next: () => {
-        this.loadExpediente();
-      }
+      next: () => this.loadExpediente()
     });
   }
 }
