@@ -9,12 +9,32 @@ from apps.identity.models import CustomUser
 from apps.students.models import Student, Semester, AcademicCommittee
 from apps.tutoring.models import TutoringSession, TutoringParticipant, TutoringObservation
 from apps.agreements.models import Agreement, AgreementAuditLog
+from apps.thesis.models import ThesisProgress
+from apps.evidence.models import Evidence
+from apps.academic_output.models import Publication, AcademicEvent, ResearchStay, OtherProduct
 
 def run_seed():
-    print("Iniciando seed de datos para Sprint 1 y 2...")
+    print("=================================================================")
+    print("CARGANDO DATOS DEMO COMPLETOS DE N.E.X.U.S. (RELEASE RC 1.0)")
+    print("=================================================================")
     
-    # 1. Coordinador
-    coord, _ = CustomUser.objects.get_or_create(
+    # 1. Administrador del Sistema
+    admin_user, _ = CustomUser.objects.get_or_create(
+        email='admin@posgrado.edu',
+        defaults={
+            'first_name': 'Super',
+            'last_name': 'Administrador',
+            'role': CustomUser.Role.COORDINADOR,
+            'is_staff': True,
+            'is_superuser': True
+        }
+    )
+    admin_user.set_password('NexusAdmin2025!')
+    admin_user.save()
+    print("-> 1 Administrador cargado (admin@posgrado.edu).")
+
+    # 2. Coordinadora de Posgrado
+    coord_user, _ = CustomUser.objects.get_or_create(
         email='coordinador@posgrado.edu',
         defaults={
             'first_name': 'Dra. Elena',
@@ -24,203 +44,202 @@ def run_seed():
             'is_superuser': True
         }
     )
-    coord.set_password('NexusCoord2025!')
-    coord.save()
+    coord_user.set_password('NexusCoord2025!')
+    coord_user.save()
+    print("-> 1 Coordinador cargado (coordinador@posgrado.edu).")
 
-    # 2. Asesores
-    asesor1, _ = CustomUser.objects.get_or_create(
-        email='alonzo.church@posgrado.edu',
-        defaults={
-            'first_name': 'Dr. Alonzo',
-            'last_name': 'Church',
-            'role': CustomUser.Role.ASESOR
-        }
-    )
-    asesor1.set_password('AsesorSecure2025!')
-    asesor1.save()
+    # 3. 5 Asesores Académicos
+    asesores_data = [
+        ('alonzo.church@posgrado.edu', 'Dr. Alonzo', 'Church', 'AsesorSecure2025!'),
+        ('claude.shannon@posgrado.edu', 'Dr. Claude', 'Shannon', 'AsesorSecure2025!'),
+        ('ada.lovelace@posgrado.edu', 'Dra. Ada', 'Lovelace', 'AsesorSecure2025!'),
+        ('john.vonneumann@posgrado.edu', 'Dr. John', 'Von Neumann', 'AsesorSecure2025!'),
+        ('grace.hopper@posgrado.edu', 'Dra. Grace', 'Hopper', 'AsesorSecure2025!')
+    ]
+    asesores = []
+    for email, fn, ln, pwd in asesores_data:
+        u, _ = CustomUser.objects.get_or_create(
+            email=email,
+            defaults={'first_name': fn, 'last_name': ln, 'role': CustomUser.Role.ASESOR}
+        )
+        u.set_password(pwd)
+        u.save()
+        asesores.append(u)
+    print(f"-> {len(asesores)} Asesores cargados exitosamente.")
 
-    asesor2, _ = CustomUser.objects.get_or_create(
-        email='ada.lovelace@posgrado.edu',
-        defaults={
-            'first_name': 'Dra. Barbara',
-            'last_name': 'Liskov',
-            'role': CustomUser.Role.ASESOR
-        }
-    )
-    asesor2.set_password('AsesorSecure2025!')
-    asesor2.save()
+    # 4. 10 Estudiantes en Semestres 1 a 6 con Trayectorias Completas
+    estudiantes_data = [
+        ('alan.turing@posgrado.edu', 'Alan', 'Turing', 'DOC-2024-001', 'Doctorado en Ciencias de la Computación', '2024-A', 3, asesores[0], asesores[1]),
+        ('katherine.johnson@posgrado.edu', 'Katherine', 'Johnson', 'DOC-2023-002', 'Doctorado en Ciencias de la Computación', '2023-B', 4, asesores[1], asesores[2]),
+        ('margaret.hamilton@posgrado.edu', 'Margaret', 'Hamilton', 'DOC-2022-003', 'Doctorado en Ingeniería de Software', '2022-A', 6, asesores[2], asesores[3]),
+        ('linus.torvalds@posgrado.edu', 'Linus', 'Torvalds', 'DOC-2024-004', 'Doctorado en Sistemas Distribuidos', '2024-B', 2, asesores[3], asesores[4]),
+        ('barbara.liskov@posgrado.edu', 'Barbara', 'Liskov', 'DOC-2023-005', 'Doctorado en Ingeniería de Software', '2023-A', 5, asesores[4], asesores[0]),
+        ('donald.knuth@posgrado.edu', 'Donald', 'Knuth', 'DOC-2025-006', 'Doctorado en Ciencias de la Computación', '2025-A', 1, asesores[0], asesores[2]),
+        ('tim.bernerslee@posgrado.edu', 'Tim', 'Berners-Lee', 'DOC-2024-007', 'Doctorado en Sistemas Inteligentes', '2024-A', 3, asesores[1], asesores[4]),
+        ('eddsger.dijkstra@posgrado.edu', 'Edsger', 'Dijkstra', 'DOC-2023-008', 'Doctorado en Métodos Formales', '2023-B', 4, asesores[3], asesores[0]),
+        ('shafi.goldwasser@posgrado.edu', 'Shafi', 'Goldwasser', 'DOC-2022-009', 'Doctorado en Criptografía Avanzada', '2022-B', 6, asesores[2], asesores[1]),
+        ('dennis.ritchie@posgrado.edu', 'Dennis', 'Ritchie', 'DOC-2024-010', 'Doctorado en Arquitectura de Software', '2024-B', 2, asesores[4], asesores[3]),
+    ]
 
-    # 3. Estudiante
-    estudiante_user, _ = CustomUser.objects.get_or_create(
-        email='alan.turing@posgrado.edu',
-        defaults={
-            'first_name': 'Alan',
-            'last_name': 'Turing',
-            'role': CustomUser.Role.ESTUDIANTE
-        }
-    )
-    estudiante_user.set_password('StudentSecure2025!')
-    estudiante_user.save()
+    for email, fn, ln, mat, prog, coh, sem_act, as_p, as_c in estudiantes_data:
+        st_user, _ = CustomUser.objects.get_or_create(
+            email=email,
+            defaults={'first_name': fn, 'last_name': ln, 'role': CustomUser.Role.ESTUDIANTE}
+        )
+        st_user.set_password('StudentSecure2025!')
+        st_user.save()
 
-    student, _ = Student.objects.get_or_create(
-        matricula='DOC-2024-001',
-        defaults={
-            'user': estudiante_user,
-            'nombre_completo': 'Alan Turing',
-            'programa_doctoral': 'Doctorado en Ciencias de la Computación',
-            'fecha_ingreso': date(2024, 1, 15),
-            'cohorte': '2024-A',
-            'estatus_activo': True
-        }
-    )
+        student, _ = Student.objects.get_or_create(
+            matricula=mat,
+            defaults={
+                'user': st_user,
+                'nombre_completo': f"{fn} {ln}",
+                'programa_doctoral': prog,
+                'fecha_ingreso': date(2022 if '2022' in coh else (2023 if '2023' in coh else (2024 if '2024' in coh else 2025)), 1 if 'A' in coh else 8, 15),
+                'cohorte': coh,
+                'estatus_activo': True
+            }
+        )
 
-    # 4. Semestres
-    s1, _ = Semester.objects.get_or_create(
-        student=student,
-        numero=1,
-        defaults={
-            'fecha_inicio': date(2024, 1, 15),
-            'fecha_fin': date(2024, 6, 30),
-            'is_active': False
-        }
-    )
-    s2, _ = Semester.objects.get_or_create(
-        student=student,
-        numero=2,
-        defaults={
-            'fecha_inicio': date(2024, 8, 1),
-            'fecha_fin': date(2024, 12, 15),
-            'is_active': True
-        }
-    )
+        # Semestres 1 a sem_act
+        for num in range(1, sem_act + 1):
+            sem, _ = Semester.objects.get_or_create(
+                student=student,
+                numero=num,
+                defaults={
+                    'fecha_inicio': date(2023, 1, 15) + timedelta(days=(num - 1) * 180),
+                    'fecha_fin': date(2023, 6, 30) + timedelta(days=(num - 1) * 180),
+                    'is_active': (num == sem_act)
+                }
+            )
 
-    # 5. Comité Tutoral
-    AcademicCommittee.objects.get_or_create(
-        student=student,
-        user=asesor1,
-        rol_comite=AcademicCommittee.RolComite.ASESOR_PRINCIPAL
-    )
-    AcademicCommittee.objects.get_or_create(
-        student=student,
-        user=asesor2,
-        rol_comite=AcademicCommittee.RolComite.COASESOR
-    )
+            # Comité
+            if num == 1:
+                AcademicCommittee.objects.get_or_create(
+                    student=student,
+                    user=as_p,
+                    defaults={'rol_comite': AcademicCommittee.RolComite.ASESOR_PRINCIPAL}
+                )
+                AcademicCommittee.objects.get_or_create(
+                    student=student,
+                    user=as_c,
+                    defaults={'rol_comite': AcademicCommittee.RolComite.COASESOR}
+                )
 
-    # 6. Sesiones de Tutoría
-    sess1, _ = TutoringSession.objects.get_or_create(
-        student=student,
-        semester=s1,
-        fecha_sesion=date(2024, 3, 10),
-        defaults={
-            'modalidad': TutoringSession.Modalidad.PRESENCIAL,
-            'resumen_general': 'Revisión inicial del protocolo de investigación doctoral y delimitación del estado del arte.',
-            'proxima_reunion_fecha': date(2024, 4, 15),
-            'proxima_reunion_notas': 'Entrega de primera versión del marco teórico con 30 referencias indexadas.',
-            'created_by': asesor1
-        }
-    )
-    TutoringParticipant.objects.get_or_create(session=sess1, user=asesor1, defaults={'rol_en_sesion': 'Asesor Principal'})
-    TutoringParticipant.objects.get_or_create(session=sess1, user=estudiante_user, defaults={'rol_en_sesion': 'Doctorando'})
-    TutoringObservation.objects.get_or_create(
-        session=sess1,
-        autor=asesor1,
-        tema_revisado='Protocolo y Marco Teórico',
-        defaults={'observaciones_detalladas': 'El enfoque de agentes es sólido. Se recomienda acotar los benchmarks experimentales.'}
-    )
+            # Tutoría por semestre
+            tut, _ = TutoringSession.objects.get_or_create(
+                student=student,
+                semester=sem,
+                fecha_sesion=sem.fecha_inicio + timedelta(days=30),
+                defaults={
+                    'modalidad': TutoringSession.Modalidad.PRESENCIAL,
+                    'resumen_general': f"Revisión y seguimiento del plan de trabajo en Semestre {num}.",
+                    'created_by': as_p,
+                    'proxima_reunion_fecha': sem.fecha_inicio + timedelta(days=60),
+                    'proxima_reunion_notas': "Evaluación de avances metodológicos y entregables."
+                }
+            )
+            TutoringParticipant.objects.get_or_create(session=tut, user=as_p, defaults={'rol_en_sesion': 'Director de Tesis'})
+            TutoringParticipant.objects.get_or_create(session=tut, user=st_user, defaults={'rol_en_sesion': 'Doctorando'})
 
-    sess2, _ = TutoringSession.objects.get_or_create(
-        student=student,
-        semester=s2,
-        fecha_sesion=date(2024, 9, 20),
-        defaults={
-            'modalidad': TutoringSession.Modalidad.VIRTUAL,
-            'resumen_general': 'Evaluación del diseño experimental y pipeline de procesamiento con LLMs.',
-            'proxima_reunion_fecha': date(2024, 11, 5),
-            'proxima_reunion_notas': 'Demostración del prototipo funcional.',
-            'created_by': asesor1
-        }
-    )
-    TutoringParticipant.objects.get_or_create(session=sess2, user=asesor1, defaults={'rol_en_sesion': 'Asesor Principal'})
-    TutoringParticipant.objects.get_or_create(session=sess2, user=asesor2, defaults={'rol_en_sesion': 'Coasesora'})
-    TutoringObservation.objects.get_or_create(
-        session=sess2,
-        autor=asesor2,
-        tema_revisado='Métricas y Arquitectura DRF/Angular',
-        defaults={'observaciones_detalladas': 'Excelente modularidad. Asegurar que las validaciones relacionales no generen sobrecarga N+1.'}
-    )
+            TutoringObservation.objects.get_or_create(
+                session=tut,
+                autor=as_p,
+                tema_revisado=f"Avance de Tesis Semestre {num}",
+                defaults={'observaciones_detalladas': f"Cumplimiento satisfactorio de metas pactadas para el semestre {num}."}
+            )
 
-    # 7. Acuerdos con los 4 Estados del Semáforo
-    a1, _ = Agreement.objects.get_or_create(
-        student=student,
-        session=sess1,
-        semester=s1,
-        descripcion='Entrega de Protocolo Doctoral Aprobado por el Comité.',
-        defaults={
-            'responsable': estudiante_user,
-            'fecha_limite': date(2024, 5, 30),
-            'estado': Agreement.Estado.CONCLUIDO,
-            'modificado_por': asesor1
-        }
-    )
-    AgreementAuditLog.objects.get_or_create(
-        agreement=a1,
-        estado_anterior='PENDIENTE',
-        estado_nuevo='CONCLUIDO',
-        defaults={'cambiado_por': asesor1, 'comentario': 'Protocolo validado y aprobado en sesión extraordinaria.'}
-    )
+            # Acuerdos en 4 Estados
+            estados = [Agreement.Estado.PENDIENTE, Agreement.Estado.EN_PROCESO, Agreement.Estado.CONCLUIDO, Agreement.Estado.VENCIDO]
+            for idx_e, est in enumerate(estados):
+                agr, _ = Agreement.objects.get_or_create(
+                    student=student,
+                    semester=sem,
+                    descripcion=f"Compromiso de {est} - Semestre {num} (#{idx_e+1})",
+                    defaults={
+                        'session': tut,
+                        'responsable': st_user,
+                        'fecha_limite': date.today() + timedelta(days=15 if est != Agreement.Estado.VENCIDO else -10),
+                        'estado': est
+                    }
+                )
+                AgreementAuditLog.objects.get_or_create(
+                    agreement=agr,
+                    cambiado_por=as_p,
+                    estado_anterior='',
+                    estado_nuevo=est,
+                    defaults={'comentario': f'Creación inicial del acuerdo en estado {est}.'}
+                )
 
-    a2, _ = Agreement.objects.get_or_create(
-        student=student,
-        session=sess2,
-        semester=s2,
-        descripcion='Borrador de Artículo para Journal JCR Q1.',
-        defaults={
-            'responsable': estudiante_user,
-            'fecha_limite': date.today() + timedelta(days=20),
-            'estado': Agreement.Estado.EN_PROCESO,
-            'modificado_por': asesor1
-        }
-    )
-    AgreementAuditLog.objects.get_or_create(
-        agreement=a2,
-        estado_anterior='PENDIENTE',
-        estado_nuevo='EN_PROCESO',
-        defaults={'cambiado_por': estudiante_user, 'comentario': 'Sección de resultados en redacción avanzada.'}
-    )
+            # Avance de Tesis
+            pct = min(100, int((num / 6) * 100))
+            ThesisProgress.objects.get_or_create(
+                student=student,
+                semester=sem,
+                defaults={
+                    'porcentaje_avance': pct,
+                    'fecha_registro': sem.fecha_inicio + timedelta(days=50),
+                    'registrado_por': as_p,
+                    'observaciones': f"Evaluación semestral {num} con avance global del {pct}%.",
+                    'componentes_json': {
+                        'protocolo': min(100, pct * 2),
+                        'estado_arte': min(100, int(pct * 1.5)),
+                        'marco_teorico': min(100, int(pct * 1.2)),
+                        'metodologia': min(100, pct),
+                        'analisis': max(0, pct - 20),
+                        'redaccion': max(0, pct - 30)
+                    }
+                }
+            )
 
-    a3, _ = Agreement.objects.get_or_create(
-        student=student,
-        session=sess2,
-        semester=s2,
-        descripcion='Implementación del módulo de Machine Learning en Python.',
-        defaults={
-            'responsable': estudiante_user,
-            'fecha_limite': date.today() + timedelta(days=40),
-            'estado': Agreement.Estado.PENDIENTE,
-            'modificado_por': asesor1
-        }
-    )
+        # Publicación Científica (HU-17)
+        sem_1 = student.semesters.first()
+        Publication.objects.get_or_create(
+            student=student,
+            semester=sem_1,
+            titulo=f"Autonomous Multi-Agent Investigation - Research of {student.nombre_completo}",
+            defaults={
+                'autores_texto': f"{student.nombre_completo}, {student.asesor_principal}",
+                'tipo': Publication.TipoPublicacion.ARTICULO_JCR,
+                'revista_editorial': 'IEEE Transactions on Software Engineering',
+                'estado': Publication.Estado.PUBLICADO,
+                'fecha_publicacion': date(2024, 6, 15),
+                'doi_url': f"https://doi.org/10.1109/TSE.2024.{student.id}001"
+            }
+        )
 
-    a4, _ = Agreement.objects.get_or_create(
-        student=student,
-        session=sess1,
-        semester=s1,
-        descripcion='Registro de asignaturas optativas y seminario doctoral.',
-        defaults={
-            'responsable': estudiante_user,
-            'fecha_limite': date(2024, 6, 1),
-            'estado': Agreement.Estado.VENCIDO,
-            'modificado_por': None
-        }
-    )
-    AgreementAuditLog.objects.get_or_create(
-        agreement=a4,
-        estado_anterior='PENDIENTE',
-        estado_nuevo='VENCIDO',
-        defaults={'cambiado_por': None, 'comentario': 'Fecha límite superada sin confirmación de trámite.'}
-    )
+        # Congreso (HU-18)
+        AcademicEvent.objects.get_or_create(
+            student=student,
+            semester=sem_1,
+            titulo_ponencia=f"Longitudinal Tracking & AI Supervision: A Study by {student.nombre_completo}",
+            defaults={
+                'tipo_evento': AcademicEvent.TipoEvento.CONGRESO_INTERNACIONAL,
+                'nombre_evento': 'ACM/IEEE International Conference on Automated Software Engineering (ASE)',
+                'fecha_presentacion': date(2024, 9, 20),
+                'sede_lugar': 'Sacramento, California, EE. UU.',
+                'modalidad': AcademicEvent.Modalidad.PRESENCIAL
+            }
+        )
 
-    print("Seed de Sprint 1 y Sprint 2 completado exitosamente.")
+        # Estancia (HU-19)
+        ResearchStay.objects.get_or_create(
+            student=student,
+            semester=sem_1,
+            institucion_receptora='Stanford AI Laboratory (SAIL)',
+            defaults={
+                'pais': 'Estados Unidos',
+                'fecha_inicio': date(2024, 7, 1),
+                'fecha_fin': date(2024, 9, 1),
+                'responsable_estancia': 'Prof. Andrew Ng',
+                'objetivos': 'Desarrollo y validación de modelos de orquestación multi-agente.'
+            }
+        )
+
+    print(f"-> 10 Estudiantes con semestres 1 a 6, comités, tutorías, acuerdos, tesis y publicaciones cargados.")
+    print("\n=================================================================")
+    print("✅ BASE DE DATOS DE DEMOSTRACIÓN CARGADA SATISFACTORIAMENTE")
+    print("=================================================================")
 
 if __name__ == '__main__':
     run_seed()
