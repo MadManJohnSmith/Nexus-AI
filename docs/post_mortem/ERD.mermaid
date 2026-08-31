@@ -1,0 +1,225 @@
+```mermaid
+erDiagram
+    %% ==========================================
+    %% N.E.X.U.S. - DIAGRAMA ENTIDAD-RELACIÓN (ERD)
+    %% ARQUITECTURA MODULAR DE 9 APPS Y TIMELINE
+    %% ==========================================
+
+    %% 1. APP: IDENTITY
+    CustomUser {
+        bigint id PK
+        varchar_255 email UK "db_index"
+        varchar_128 password
+        varchar_150 first_name
+        varchar_150 last_name
+        varchar_20 role "COORDINADOR, ASESOR, ESTUDIANTE"
+        boolean is_active
+        boolean is_staff
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% 2. APP: STUDENTS
+    Student {
+        bigint id PK
+        bigint user_id FK "1:1 nullable, on_delete=SET_NULL"
+        varchar_30 matricula UK "db_index"
+        varchar_255 nombre_completo
+        varchar_255 programa_doctoral
+        date fecha_ingreso
+        varchar_30 cohorte "db_index"
+        boolean estatus_activo "db_index"
+        datetime created_at
+        datetime updated_at
+    }
+
+    Semester {
+        bigint id PK
+        bigint student_id FK "1:N, on_delete=CASCADE"
+        smallint numero "1 a 6, db_index"
+        date fecha_inicio
+        date fecha_fin
+        boolean is_active
+        datetime created_at
+    }
+
+    AcademicCommittee {
+        bigint id PK
+        bigint student_id FK "1:N, on_delete=CASCADE"
+        bigint user_id FK "1:N, on_delete=CASCADE"
+        varchar_30 rol_comite "ASESOR_PRINCIPAL, COASESOR, VOCAL, SECRETARIO"
+        date fecha_asignacion
+        boolean is_active
+    }
+
+    %% 3. APP: TUTORING
+    TutoringSession {
+        bigint id PK
+        bigint student_id FK "1:N, on_delete=CASCADE, db_index"
+        bigint semester_id FK "1:N, on_delete=CASCADE, db_index"
+        date fecha_sesion "db_index (Index Timeline)"
+        varchar_20 modalidad "PRESENCIAL, VIRTUAL"
+        text resumen_general
+        date proxima_reunion_fecha "nullable, db_index"
+        varchar_255 proxima_reunion_notas "nullable"
+        bigint created_by_id FK "on_delete=SET_NULL"
+        datetime created_at
+        datetime updated_at
+    }
+
+    TutoringParticipant {
+        bigint id PK
+        bigint session_id FK "1:N, on_delete=CASCADE"
+        bigint user_id FK "1:N, on_delete=CASCADE"
+        varchar_50 rol_en_sesion
+        boolean asistencia_confirmada
+    }
+
+    TutoringObservation {
+        bigint id PK
+        bigint session_id FK "1:N, on_delete=CASCADE"
+        bigint autor_id FK "on_delete=SET_NULL"
+        varchar_255 tema_revisado
+        text observaciones_detalladas
+        datetime created_at
+    }
+
+    %% 4. APP: AGREEMENTS
+    Agreement {
+        bigint id PK
+        bigint session_id FK "1:N nullable, on_delete=SET_NULL"
+        bigint student_id FK "1:N, on_delete=CASCADE, db_index"
+        bigint semester_id FK "1:N nullable, on_delete=CASCADE"
+        text descripcion
+        bigint responsable_id FK "on_delete=CASCADE"
+        date fecha_limite "db_index (Index Alertas/Timeline)"
+        varchar_20 estado "PENDIENTE, EN_PROCESO, CONCLUIDO, VENCIDO, db_index"
+        datetime created_at
+        datetime updated_at
+    }
+
+    AgreementAuditLog {
+        bigint id PK
+        bigint agreement_id FK "1:N, on_delete=CASCADE"
+        bigint cambiado_por_id FK "on_delete=SET_NULL"
+        varchar_20 estado_anterior
+        varchar_20 estado_nuevo
+        text comentario
+        datetime fecha_cambio "db_index"
+    }
+
+    %% 5. APP: THESIS
+    ThesisProgress {
+        bigint id PK
+        bigint student_id FK "1:N, on_delete=CASCADE, db_index"
+        bigint semester_id FK "1:N, on_delete=CASCADE, db_index"
+        smallint porcentaje_avance "0 a 100"
+        json componentes_json "protocolo, estadoArte, marcoTeorico, metodologia, analisis, redaccion"
+        text observaciones
+        bigint registrado_por_id FK "on_delete=SET_NULL"
+        date fecha_registro "db_index (Index Timeline)"
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% 6. APP: EVIDENCE
+    Evidence {
+        bigint id PK
+        bigint student_id FK "1:N, on_delete=CASCADE, db_index"
+        bigint semester_id FK "1:N, on_delete=CASCADE"
+        varchar_20 tipo "ARCHIVO_LOCAL, ENLACE_DOI"
+        varchar_20 actividad_tipo "TUTORIA, ACUERDO, TESIS, OTRO"
+        bigint actividad_id "nullable, db_index"
+        varchar_255 archivo_adjunto "nullable (15MB máx, MIME)"
+        varchar_255 url_doi "nullable"
+        varchar_255 descripcion
+        varchar_100 mime_type "nullable"
+        bigint file_size_bytes "nullable"
+        bigint cargado_por_id FK "on_delete=SET_NULL"
+        datetime fecha_carga "db_index (Index Timeline)"
+    }
+
+    %% 7. APP: ACADEMIC_OUTPUT
+    Publication {
+        bigint id PK
+        bigint student_id FK "1:N, on_delete=CASCADE, db_index"
+        bigint semester_id FK "1:N, on_delete=CASCADE"
+        varchar_255 titulo
+        varchar_255 autores_texto
+        varchar_30 tipo "ARTICULO_JCR, ARTICULO_CONACYT, CAPITULO_LIBRO"
+        varchar_255 revista_editorial
+        varchar_20 estado "PREPARACION, ENVIADO, EN_REVISION, ACEPTADO, PUBLICADO"
+        date fecha_publicacion "nullable, db_index"
+        varchar_255 doi_url
+        bigint evidencia_id FK "1:1 nullable, on_delete=SET_NULL"
+        datetime created_at
+        datetime updated_at
+    }
+
+    AcademicEvent {
+        bigint id PK
+        bigint student_id FK "1:N, on_delete=CASCADE, db_index"
+        bigint semester_id FK "1:N, on_delete=CASCADE"
+        varchar_30 tipo_evento "CONGRESO_NACIONAL, CONGRESO_INTERNACIONAL, COLOQUIO"
+        varchar_255 nombre_evento
+        varchar_255 titulo_ponencia
+        date fecha_presentacion "db_index (Index Timeline)"
+        varchar_255 sede_lugar
+        varchar_20 modalidad "PRESENCIAL, VIRTUAL"
+        bigint evidencia_id FK "1:1 nullable, on_delete=SET_NULL"
+        datetime created_at
+        datetime updated_at
+    }
+
+    ResearchStay {
+        bigint id PK
+        bigint student_id FK "1:N, on_delete=CASCADE, db_index"
+        bigint semester_id FK "1:N, on_delete=CASCADE"
+        varchar_255 institucion_receptora
+        varchar_100 pais
+        date fecha_inicio "db_index (Index Timeline)"
+        date fecha_fin
+        varchar_255 responsable_estancia
+        text objetivos
+        bigint evidencia_id FK "1:1 nullable, on_delete=SET_NULL"
+        datetime created_at
+        datetime updated_at
+    }
+
+    OtherProduct {
+        bigint id PK
+        bigint student_id FK "1:N, on_delete=CASCADE, db_index"
+        bigint semester_id FK "1:N, on_delete=CASCADE"
+        varchar_30 tipo_producto "SOFTWARE, PROTOTIPO, PATENTE"
+        varchar_255 titulo
+        text descripcion
+        date fecha_registro "db_index (Index Timeline)"
+        bigint evidencia_id FK "1:1 nullable, on_delete=SET_NULL"
+        datetime created_at
+        datetime updated_at
+    }
+
+    %% RELACIONES ENTRE ENTIDADES
+    CustomUser ||--o| Student : "perfil_estudiante"
+    CustomUser ||--o{ AcademicCommittee : "miembro_comite"
+    Student ||--o{ AcademicCommittee : "comite_asignado"
+    Student ||--o{ Semester : "tiene_semestres"
+    Student ||--o{ TutoringSession : "recibe_tutorias"
+    Semester ||--o{ TutoringSession : "en_periodo"
+    TutoringSession ||--o{ TutoringParticipant : "asistentes"
+    TutoringSession ||--o{ TutoringObservation : "observaciones"
+    TutoringSession ||--o{ Agreement : "acuerdos_derivados"
+    Student ||--o{ Agreement : "compromisos"
+    Agreement ||--o{ AgreementAuditLog : "bitacora_estados"
+    Student ||--o{ ThesisProgress : "avances_tesis"
+    Semester ||--o{ ThesisProgress : "evaluacion_semestral"
+    Student ||--o{ Evidence : "evidencias_cargadas"
+    Student ||--o{ Publication : "articulos_publicados"
+    Student ||--o{ AcademicEvent : "ponencias_congresos"
+    Student ||--o{ ResearchStay : "estancias_doctorales"
+    Student ||--o{ OtherProduct : "productos_software"
+    Evidence ||--o| Publication : "evidencia_publicacion"
+    Evidence ||--o| AcademicEvent : "evidencia_evento"
+    Evidence ||--o| ResearchStay : "evidencia_estancia"
+    Evidence ||--o| OtherProduct : "evidencia_producto"
+```
