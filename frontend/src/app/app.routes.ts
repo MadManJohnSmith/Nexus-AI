@@ -4,6 +4,7 @@ import { StudentOverviewComponent } from './features/student-overview/student-ov
 import { AgreementsListComponent } from './features/agreements/agreements-list.component';
 import { TimelineViewComponent } from './features/timeline/timeline-view.component';
 import { CoordinatorDashboardComponent } from './features/dashboard/coordinator-dashboard.component';
+import { StudentDossierReportComponent } from './features/reporting/student-dossier-report.component';
 import { AppShellComponent } from './shared/components/app-shell/app-shell.component';
 import { authGuard, coordinatorGuard } from './core/guards/auth.guard';
 
@@ -45,7 +46,7 @@ export const routes: Routes = [
       },
       {
         path: 'reports',
-        component: StudentOverviewComponent
+        component: StudentDossierReportComponent
       }
     ]
   },

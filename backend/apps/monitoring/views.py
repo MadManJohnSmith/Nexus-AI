@@ -5,7 +5,7 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework import status
 from django.utils import timezone
 from datetime import timedelta, date
-from django.db.models import Q, Count, Avg
+from django.db.models import Q
 
 from apps.identity.models import CustomUser
 from apps.students.models import Student, Semester
@@ -14,6 +14,19 @@ from apps.agreements.models import Agreement
 from apps.thesis.models import ThesisProgress
 from apps.evidence.models import Evidence
 from apps.academic_output.models import Publication, AcademicEvent, ResearchStay, OtherProduct
+from apps.monitoring.supervision_service import SupervisionRulesEngine
+
+
+class SupervisionAlertsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role != CustomUser.Role.COORDINADOR and not user.is_staff:
+            raise PermissionDenied("Acceso exclusivo para la Coordinación de Posgrado.")
+
+        alerts_report = SupervisionRulesEngine.evaluate_rules()
+        return Response(alerts_report, status=status.HTTP_200_OK)
 
 
 class CoordinatorDashboardView(APIView):
@@ -45,7 +58,6 @@ class CoordinatorDashboardView(APIView):
 
         casos_atencion = []
         for s in students:
-            # Última tutoría
             latest_tutoria = s.tutoring_sessions.order_by('-fecha_sesion').first()
             if latest_tutoria:
                 dias_sin_tutoria = (today - latest_tutoria.fecha_sesion).days
@@ -54,17 +66,14 @@ class CoordinatorDashboardView(APIView):
                 dias_sin_tutoria = (today - s.fecha_ingreso).days
                 fecha_ult_tutoria = "Sin tutorías previas"
 
-            # Acuerdos vencidos
             acuerdos_vencidos = s.agreements.filter(
                 Q(estado=Agreement.Estado.VENCIDO) |
                 (Q(estado__in=[Agreement.Estado.PENDIENTE, Agreement.Estado.EN_PROCESO]) & Q(fecha_limite__lt=today))
             ).count()
 
-            # Avance más reciente de tesis
             latest_thesis = s.thesis_progress_records.order_by('-fecha_registro', '-created_at').first()
             pct_tesis = latest_thesis.porcentaje_avance if latest_thesis else 0
 
-            # Determinación de riesgo
             nivel_riesgo = 'BAJO'
             motivos = []
 
@@ -98,7 +107,6 @@ class CoordinatorDashboardView(APIView):
                 'motivos_riesgo': motivos
             })
 
-        # Ordenar: primero ALTO, luego MEDIO, luego BAJO
         risk_priority = {'ALTO': 1, 'MEDIO': 2, 'BAJO': 3}
         casos_atencion.sort(key=lambda x: (risk_priority.get(x['nivel_riesgo'], 4), -x['dias_sin_tutoria']))
 
@@ -215,7 +223,6 @@ class MonitoringTimelineView(APIView):
         except Student.DoesNotExist:
             return Response({'error': 'Estudiante no encontrado.'}, status=status.HTTP_404_NOT_FOUND)
 
-        # RBAC Check
         user = request.user
         if user.role == CustomUser.Role.ESTUDIANTE and student.user != user:
             return Response({'error': 'Acceso no autorizado al timeline de este estudiante.'}, status=status.HTTP_403_FORBIDDEN)
@@ -320,7 +327,7 @@ class MonitoringTimelineView(APIView):
                 }
             })
 
-        # 5. Publicaciones Científicas (🎓)
+        # 5. Publicaciones
         publications_qs = Publication.objects.filter(student=student).select_related('semester')
         for p in publications_qs:
             events.append({
@@ -362,7 +369,7 @@ class MonitoringTimelineView(APIView):
                 }
             })
 
-        # 7. Estancias de Investigación
+        # 7. Estancias
         stays_qs = ResearchStay.objects.filter(student=student).select_related('semester')
         for st in stays_qs:
             events.append({
