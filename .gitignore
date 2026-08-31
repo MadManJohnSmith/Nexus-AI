@@ -1,0 +1,19 @@
+# Python / Django
+__pycache__/
+*.py[cod]
+*$py.class
+*.sqlite3
+.venv/
+staticfiles/
+
+# Node / Angular
+node_modules/
+dist/
+.npm-cache/
+npm_cache/
+.angular/
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
