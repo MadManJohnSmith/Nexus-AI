@@ -1,17 +1,140 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
 from rest_framework import status
 from django.utils import timezone
-from datetime import timedelta
-from django.db.models import Q
+from datetime import timedelta, date
+from django.db.models import Q, Count, Avg
 
 from apps.identity.models import CustomUser
-from apps.students.models import Student
+from apps.students.models import Student, Semester
 from apps.tutoring.models import TutoringSession
 from apps.agreements.models import Agreement
 from apps.thesis.models import ThesisProgress
 from apps.evidence.models import Evidence
+from apps.academic_output.models import Publication, AcademicEvent, ResearchStay, OtherProduct
+
+
+class CoordinatorDashboardView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if user.role != CustomUser.Role.COORDINADOR and not user.is_staff:
+            raise PermissionDenied("Acceso exclusivo para Coordinadores de Posgrado.")
+
+        today = timezone.localdate()
+
+        # 1. KPIs Globales
+        total_estudiantes_activos = Student.objects.filter(estatus_activo=True).count()
+        total_tutorias = TutoringSession.objects.count()
+        total_acuerdos_pendientes = Agreement.objects.filter(estado__in=[Agreement.Estado.PENDIENTE, Agreement.Estado.EN_PROCESO]).count()
+        total_acuerdos_vencidos = Agreement.objects.filter(
+            Q(estado=Agreement.Estado.VENCIDO) |
+            (Q(estado__in=[Agreement.Estado.PENDIENTE, Agreement.Estado.EN_PROCESO]) & Q(fecha_limite__lt=today))
+        ).count()
+        total_publicaciones = Publication.objects.count()
+        total_eventos = AcademicEvent.objects.count()
+        total_estancias = ResearchStay.objects.count()
+
+        # 2. Casos de Atención y Semáforo de Riesgo
+        students = Student.objects.filter(estatus_activo=True).prefetch_related(
+            'tutoring_sessions', 'agreements', 'thesis_progress_records'
+        )
+
+        casos_atencion = []
+        for s in students:
+            # Última tutoría
+            latest_tutoria = s.tutoring_sessions.order_by('-fecha_sesion').first()
+            if latest_tutoria:
+                dias_sin_tutoria = (today - latest_tutoria.fecha_sesion).days
+                fecha_ult_tutoria = str(latest_tutoria.fecha_sesion)
+            else:
+                dias_sin_tutoria = (today - s.fecha_ingreso).days
+                fecha_ult_tutoria = "Sin tutorías previas"
+
+            # Acuerdos vencidos
+            acuerdos_vencidos = s.agreements.filter(
+                Q(estado=Agreement.Estado.VENCIDO) |
+                (Q(estado__in=[Agreement.Estado.PENDIENTE, Agreement.Estado.EN_PROCESO]) & Q(fecha_limite__lt=today))
+            ).count()
+
+            # Avance más reciente de tesis
+            latest_thesis = s.thesis_progress_records.order_by('-fecha_registro', '-created_at').first()
+            pct_tesis = latest_thesis.porcentaje_avance if latest_thesis else 0
+
+            # Determinación de riesgo
+            nivel_riesgo = 'BAJO'
+            motivos = []
+
+            if dias_sin_tutoria > 45:
+                nivel_riesgo = 'ALTO'
+                motivos.append(f"> 45 días sin tutoría ({dias_sin_tutoria} días)")
+            elif dias_sin_tutoria > 30:
+                nivel_riesgo = 'MEDIO'
+                motivos.append(f"> 30 días sin tutoría ({dias_sin_tutoria} días)")
+
+            if acuerdos_vencidos > 0:
+                nivel_riesgo = 'ALTO'
+                motivos.append(f"{acuerdos_vencidos} acuerdo(s) vencido(s)")
+
+            if pct_tesis < 20 and s.semestre_actual >= 3:
+                nivel_riesgo = 'ALTO'
+                motivos.append(f"Avance de tesis bajo ({pct_tesis}%) para Semestre {s.semestre_actual}")
+
+            casos_atencion.append({
+                'student_id': s.id,
+                'matricula': s.matricula,
+                'nombre_completo': s.nombre_completo,
+                'cohorte': s.cohorte,
+                'semestre_actual': s.semestre_actual,
+                'asesor_principal': s.asesor_principal,
+                'fecha_ultima_tutoria': fecha_ult_tutoria,
+                'dias_sin_tutoria': dias_sin_tutoria,
+                'acuerdos_vencidos_count': acuerdos_vencidos,
+                'porcentaje_tesis': pct_tesis,
+                'nivel_riesgo': nivel_riesgo,
+                'motivos_riesgo': motivos
+            })
+
+        # Ordenar: primero ALTO, luego MEDIO, luego BAJO
+        risk_priority = {'ALTO': 1, 'MEDIO': 2, 'BAJO': 3}
+        casos_atencion.sort(key=lambda x: (risk_priority.get(x['nivel_riesgo'], 4), -x['dias_sin_tutoria']))
+
+        # 3. Distribución de Avance de Tesis por Cohorte
+        cohortes = Student.objects.values_list('cohorte', flat=True).distinct()
+        distribucion_tesis = []
+        for c in cohortes:
+            st_in_cohorte = Student.objects.filter(cohorte=c)
+            avg_adv = 0
+            count_st = st_in_cohorte.count()
+            if count_st > 0:
+                total_adv = 0
+                for st in st_in_cohorte:
+                    l_th = st.thesis_progress_records.order_by('-fecha_registro').first()
+                    total_adv += l_th.porcentaje_avance if l_th else 0
+                avg_adv = round(total_adv / count_st, 1)
+
+            distribucion_tesis.append({
+                'cohorte': c,
+                'total_estudiantes': count_st,
+                'promedio_avance_tesis': avg_adv
+            })
+
+        return Response({
+            'kpis': {
+                'total_estudiantes_activos': total_estudiantes_activos,
+                'total_tutorias': total_tutorias,
+                'total_acuerdos_pendientes': total_acuerdos_pendientes,
+                'total_acuerdos_vencidos': total_acuerdos_vencidos,
+                'total_publicaciones': total_publicaciones,
+                'total_eventos': total_eventos,
+                'total_estancias': total_estancias
+            },
+            'casos_atencion': casos_atencion,
+            'distribucion_tesis_cohorte': distribucion_tesis
+        }, status=status.HTTP_200_OK)
 
 
 class MonitoringAlertsView(APIView):
@@ -24,7 +147,6 @@ class MonitoringAlertsView(APIView):
 
         agreements_qs = Agreement.objects.all().select_related('student', 'responsable')
 
-        # RBAC Filtering
         if user.role == CustomUser.Role.COORDINADOR or user.is_staff:
             pass
         elif user.role == CustomUser.Role.ASESOR:
@@ -39,13 +161,11 @@ class MonitoringAlertsView(APIView):
         else:
             agreements_qs = Agreement.objects.none()
 
-        # Acuerdos vencidos
         vencidos_qs = agreements_qs.filter(
             Q(estado=Agreement.Estado.VENCIDO) |
             (Q(estado__in=[Agreement.Estado.PENDIENTE, Agreement.Estado.EN_PROCESO]) & Q(fecha_limite__lt=today))
         )
 
-        # Acuerdos próximos a vencer (en los próximos 5 días)
         por_vencer_qs = agreements_qs.filter(
             estado__in=[Agreement.Estado.PENDIENTE, Agreement.Estado.EN_PROCESO],
             fecha_limite__gte=today,
@@ -85,7 +205,6 @@ class MonitoringTimelineView(APIView):
     def get(self, request):
         student_id = request.query_params.get('student')
         if not student_id:
-            # Obtener el primer estudiante accesible si no se provee parámetro
             first_st = Student.objects.first()
             if not first_st:
                 return Response({'student': None, 'events': []}, status=status.HTTP_200_OK)
@@ -201,7 +320,88 @@ class MonitoringTimelineView(APIView):
                 }
             })
 
-        # Orden cronológico descendente (más reciente primero)
+        # 5. Publicaciones Científicas (🎓)
+        publications_qs = Publication.objects.filter(student=student).select_related('semester')
+        for p in publications_qs:
+            events.append({
+                'id': f"publicacion-{p.id}",
+                'raw_id': p.id,
+                'tipo': 'PUBLICACION',
+                'tipo_label': f"Publicación Científica 🎓 ({p.get_estado_display()})",
+                'titulo': p.titulo,
+                'fecha': str(p.fecha_publicacion or p.created_at.date()),
+                'resumen': f"Revista: {p.revista_editorial} | Autores: {p.autores_texto}",
+                'semester_numero': p.semester.numero,
+                'autor_nombre': p.autores_texto,
+                'metadata': {
+                    'tipo': p.tipo,
+                    'revista_editorial': p.revista_editorial,
+                    'estado': p.estado,
+                    'doi_url': p.doi_url
+                }
+            })
+
+        # 6. Eventos y Congresos
+        events_qs = AcademicEvent.objects.filter(student=student).select_related('semester')
+        for ev in events_qs:
+            events.append({
+                'id': f"evento-{ev.id}",
+                'raw_id': ev.id,
+                'tipo': 'EVENTO',
+                'tipo_label': f"Congreso ({ev.get_tipo_evento_display()})",
+                'titulo': ev.titulo_ponencia,
+                'fecha': str(ev.fecha_presentacion),
+                'resumen': f"Evento: {ev.nombre_evento} | Sede: {ev.sede_lugar} ({ev.modalidad})",
+                'semester_numero': ev.semester.numero,
+                'autor_nombre': student.nombre_completo,
+                'metadata': {
+                    'tipo_evento': ev.tipo_evento,
+                    'nombre_evento': ev.nombre_evento,
+                    'sede_lugar': ev.sede_lugar,
+                    'modalidad': ev.modalidad
+                }
+            })
+
+        # 7. Estancias de Investigación
+        stays_qs = ResearchStay.objects.filter(student=student).select_related('semester')
+        for st in stays_qs:
+            events.append({
+                'id': f"estancia-{st.id}",
+                'raw_id': st.id,
+                'tipo': 'ESTANCIA',
+                'tipo_label': 'Estancia de Investigación',
+                'titulo': f"Estancia en {st.institucion_receptora} ({st.pais})",
+                'fecha': str(st.fecha_inicio),
+                'resumen': f"Periodo: {st.fecha_inicio} al {st.fecha_fin} | Anfitrión: {st.responsable_estancia} | Objetivos: {st.objetivos}",
+                'semester_numero': st.semester.numero,
+                'autor_nombre': student.nombre_completo,
+                'metadata': {
+                    'institucion': st.institucion_receptora,
+                    'pais': st.pais,
+                    'fecha_inicio': str(st.fecha_inicio),
+                    'fecha_fin': str(st.fecha_fin),
+                    'responsable': st.responsable_estancia
+                }
+            })
+
+        # 8. Otros Productos
+        products_qs = OtherProduct.objects.filter(student=student).select_related('semester')
+        for pr in products_qs:
+            events.append({
+                'id': f"producto-{pr.id}",
+                'raw_id': pr.id,
+                'tipo': 'PRODUCTO',
+                'tipo_label': f"Producto ({pr.get_tipo_producto_display()})",
+                'titulo': pr.titulo,
+                'fecha': str(pr.fecha_registro),
+                'resumen': pr.descripcion,
+                'semester_numero': pr.semester.numero,
+                'autor_nombre': student.nombre_completo,
+                'metadata': {
+                    'tipo_producto': pr.tipo_producto
+                }
+            })
+
         events.sort(key=lambda x: x['fecha'], reverse=True)
 
         return Response({

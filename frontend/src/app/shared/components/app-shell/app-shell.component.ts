@@ -50,6 +50,14 @@ import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
         <nav class="sidebar-nav">
           <div class="nav-section-title">SEGUIMIENTO DOCTORAL</div>
           <ul class="nav-list">
+            @if (authService.isCoordinator() && currentMode() === 'coordinacion') {
+              <li>
+                <a routerLink="/dashboard" routerLinkActive="active" class="nav-link">
+                  <span class="nav-icon">📊</span>
+                  <span class="nav-text">Dashboard Coordinador</span>
+                </a>
+              </li>
+            }
             <li>
               <a routerLink="/student-overview" routerLinkActive="active" class="nav-link">
                 <span class="nav-icon">👤</span>
@@ -172,7 +180,7 @@ import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
             </div>
             <div class="system-status">
               <span class="status-indicator"></span>
-              <span class="status-text">MVP Longitudinal Activo</span>
+              <span class="status-text">Sprint 4 Activo</span>
             </div>
           </div>
         </header>
@@ -435,7 +443,6 @@ import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
       gap: 20px;
     }
 
-    /* Notification Bell */
     .notification-wrapper {
       position: relative;
     }
@@ -622,6 +629,11 @@ export class AppShellComponent implements OnInit {
 
   public setMode(mode: 'expediente' | 'coordinacion') {
     this.currentMode.set(mode);
+    if (mode === 'coordinacion') {
+      this.router.navigate(['/dashboard']);
+    } else {
+      this.router.navigate(['/student-overview']);
+    }
   }
 
   public toggleAlertsDropdown(): void {
@@ -635,10 +647,11 @@ export class AppShellComponent implements OnInit {
 
   public getBreadcrumb(): string {
     const url = this.router.url;
+    if (url.includes('dashboard')) return 'Dashboard del Coordinador de Posgrado (KPIs)';
     if (url.includes('student-overview')) return 'Expediente Longitudinal del Doctorando';
     if (url.includes('tutoring')) return 'Módulo de Tutorías y Asesorías';
     if (url.includes('agreements')) return 'Seguimiento de Acuerdos';
-    if (url.includes('timeline')) return 'Línea de Tiempo Longitudinal (MVP)';
+    if (url.includes('timeline')) return 'Línea de Tiempo Longitudinal';
     if (url.includes('reports')) return 'Reportes Integrales de Posgrado';
     return 'Panel Principal';
   }

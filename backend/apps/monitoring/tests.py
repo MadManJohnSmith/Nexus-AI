@@ -16,7 +16,7 @@ class MonitoringAlertsAndTimelineTests(TestCase):
         self.coordinator = CustomUser.objects.create_user(
             email='coord@posgrado.edu',
             password='Pass123!Password',
-            first_name='Laura',
+            first_name='Elena',
             last_name='Coordinadora',
             role=CustomUser.Role.COORDINADOR
         )
@@ -94,9 +94,18 @@ class MonitoringAlertsAndTimelineTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertIn('events', response.data)
-        # Debe contener al menos la tutoría, los 2 acuerdos y el avance de tesis
         self.assertEqual(response.data['total_eventos'], 4)
         types = [e['tipo'] for e in response.data['events']]
         self.assertIn('TUTORIA', types)
         self.assertIn('ACUERDO', types)
         self.assertIn('TESIS', types)
+
+    def test_coordinator_dashboard_hu_24(self):
+        self.client.force_authenticate(user=self.coordinator)
+        url = reverse('coordinator-dashboard')
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertIn('kpis', response.data)
+        self.assertIn('casos_atencion', response.data)
+        self.assertIn('distribucion_tesis_cohorte', response.data)
+        self.assertEqual(response.data['kpis']['total_estudiantes_activos'], 1)

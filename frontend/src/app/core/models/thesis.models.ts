@@ -1,10 +1,28 @@
 export interface ThesisComponents {
   protocolo: number;
-  estado_arte: number;
-  marco_teorico: number;
+  estadoArte: number;
+  marcoTeorico: number;
   metodologia: number;
   analisis: number;
   redaccion: number;
+}
+
+export interface SemesterThesisHistory {
+  semesterNumero: number;
+  semesterId: number | null;
+  hasData: boolean;
+  porcentajeAvance: number;
+  fechaRegistro: string | null;
+  observaciones: string;
+  componentesJson: ThesisComponents;
+  registradoPorNombre: string | null;
+}
+
+export interface ThesisHistoryResponse {
+  studentId: number;
+  studentNombre: string;
+  studentMatricula: string;
+  semestersHistory: SemesterThesisHistory[];
 }
 
 export interface ThesisProgress {
@@ -15,11 +33,11 @@ export interface ThesisProgress {
   semester: number;
   semesterNumero?: number;
   porcentajeAvance: number;
-  componentesJson: ThesisComponents;
+  componentesJson?: ThesisComponents;
   observaciones: string;
-  fechaRegistro: string;
-  registradoPor?: number | null;
+  registradoPor?: number;
   registradoPorNombre?: string;
+  fechaRegistro: string;
   createdAt?: string;
   updatedAt?: string;
 }

@@ -11,6 +11,7 @@ urlpatterns = [
     path('api/v2/', include('apps.agreements.urls')),
     path('api/v2/', include('apps.thesis.urls')),
     path('api/v2/', include('apps.evidence.urls')),
+    path('api/v2/', include('apps.academic_output.urls')),
     path('api/v2/', include('apps.monitoring.urls')),
 ]
 

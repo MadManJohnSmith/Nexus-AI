@@ -3,8 +3,9 @@ import { LoginComponent } from './features/auth/login.component';
 import { StudentOverviewComponent } from './features/student-overview/student-overview.component';
 import { AgreementsListComponent } from './features/agreements/agreements-list.component';
 import { TimelineViewComponent } from './features/timeline/timeline-view.component';
+import { CoordinatorDashboardComponent } from './features/dashboard/coordinator-dashboard.component';
 import { AppShellComponent } from './shared/components/app-shell/app-shell.component';
-import { authGuard } from './core/guards/auth.guard';
+import { authGuard, coordinatorGuard } from './core/guards/auth.guard';
 
 export const routes: Routes = [
   {
@@ -38,16 +39,13 @@ export const routes: Routes = [
         component: TimelineViewComponent
       },
       {
-        path: 'thesis',
-        component: StudentOverviewComponent
-      },
-      {
-        path: 'evidence',
-        component: StudentOverviewComponent
+        path: 'dashboard',
+        component: CoordinatorDashboardComponent,
+        canActivate: [coordinatorGuard]
       },
       {
         path: 'reports',
-        component: StudentOverviewComponent // Sprint 5
+        component: StudentOverviewComponent
       }
     ]
   },

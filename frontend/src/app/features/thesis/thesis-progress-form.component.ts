@@ -375,8 +375,8 @@ export class ThesisProgressFormComponent implements OnInit {
 
   public componentes: ThesisComponents = {
     protocolo: 100,
-    estado_arte: 80,
-    marco_teorico: 50,
+    estadoArte: 80,
+    marcoTeorico: 50,
     metodologia: 30,
     analisis: 15,
     redaccion: 10
@@ -400,11 +400,11 @@ export class ThesisProgressFormComponent implements OnInit {
     this.successMessage.set(null);
     this.errorMessage.set(null);
 
-    this.thesisService.registerProgress({
+    this.thesisService.createProgress({
       student: this.student.id,
       semester: this.selectedSemesterId,
-      porcentaje_avance: this.porcentajeGlobal,
-      componentes_json: this.componentes,
+      porcentajeAvance: this.porcentajeGlobal,
+      componentesJson: this.componentes,
       observaciones: this.observaciones
     }).subscribe({
       next: () => {
@@ -412,7 +412,7 @@ export class ThesisProgressFormComponent implements OnInit {
         this.successMessage.set('Avance de tesis doctoral registrado exitosamente.');
         this.progressSaved.emit();
       },
-      error: (err) => {
+      error: (err: any) => {
         this.isSubmitting.set(false);
         this.errorMessage.set(err.error?.porcentaje_avance?.[0] || 'Error al guardar avance.');
       }

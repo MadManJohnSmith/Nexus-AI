@@ -1,35 +1,56 @@
-import { Injectable, inject, signal } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
-import { Observable, map, tap } from 'rxjs';
-import { AlertsResponse, TimelineResponse } from '../models/monitoring.models';
+import { Injectable, inject } from '@angular/core';
+import { HttpClient } from '@angular/common/http';
+import { Observable, map } from 'rxjs';
+import { AlertsResponse, TimelineResponse, CoordinatorDashboardResponse } from '../models/monitoring.models';
 
 @Injectable({
   providedIn: 'root'
 })
 export class MonitoringService {
   private http = inject(HttpClient);
-  private readonly API_URL = '/api/v2/monitoring';
-
-  public alertsState = signal<AlertsResponse | null>(null);
+  private alertsUrl = '/api/v2/monitoring/alerts/';
+  private timelineUrl = '/api/v2/monitoring/timeline/';
+  private dashboardUrl = '/api/v2/monitoring/coordinator-dashboard/';
 
   public getAlerts(): Observable<AlertsResponse> {
-    return this.http.get<any>(`${this.API_URL}/alerts/`).pipe(
+    return this.http.get<any>(this.alertsUrl).pipe(
       map(res => ({
         totalAlertas: res.total_alertas,
         totalVencidos: res.total_vencidos,
         totalPorVencer: res.total_por_vencer,
-        alertasVencidas: (res.alertas_vencidas || []).map(this.mapAlertItem),
-        alertasPorVencer: (res.alertas_por_vencer || []).map(this.mapAlertItem)
-      })),
-      tap(alerts => this.alertsState.set(alerts))
+        alertasVencidas: (res.alertas_vencidas || []).map((a: any) => ({
+          id: a.id,
+          tipoAlerta: a.tipo_alerta,
+          descripcion: a.descripcion,
+          studentId: a.student_id,
+          studentNombre: a.student_nombre,
+          studentMatricula: a.student_matricula,
+          responsableNombre: a.responsable_nombre,
+          fechaLimite: a.fecha_limite,
+          diasRestantes: a.dias_restantes,
+          estado: a.estado
+        })),
+        alertasPorVencer: (res.alertas_por_vencer || []).map((a: any) => ({
+          id: a.id,
+          tipoAlerta: a.tipo_alerta,
+          descripcion: a.descripcion,
+          studentId: a.student_id,
+          studentNombre: a.student_nombre,
+          studentMatricula: a.student_matricula,
+          responsableNombre: a.responsable_nombre,
+          fechaLimite: a.fecha_limite,
+          diasRestantes: a.dias_restantes,
+          estado: a.estado
+        }))
+      }))
     );
   }
 
   public getTimeline(studentId?: number): Observable<TimelineResponse> {
-    let params = new HttpParams();
-    if (studentId) params = params.set('student', studentId.toString());
+    let params: any = {};
+    if (studentId) params.student = studentId;
 
-    return this.http.get<any>(`${this.API_URL}/timeline/`, { params }).pipe(
+    return this.http.get<any>(this.timelineUrl, { params }).pipe(
       map(res => ({
         studentId: res.student_id,
         studentNombre: res.student_nombre,
@@ -45,24 +66,44 @@ export class MonitoringService {
           resumen: e.resumen,
           semesterNumero: e.semester_numero,
           autorNombre: e.autor_nombre,
-          metadata: e.metadata || {}
+          metadata: e.metadata
         }))
       }))
     );
   }
 
-  private mapAlertItem(raw: any) {
-    return {
-      id: raw.id,
-      tipoAlerta: raw.tipo_alerta,
-      descripcion: raw.descripcion,
-      studentId: raw.student_id,
-      studentNombre: raw.student_nombre,
-      studentMatricula: raw.student_matricula,
-      responsableNombre: raw.responsable_nombre,
-      fechaLimite: raw.fecha_limite,
-      diasRestantes: raw.dias_restantes,
-      estado: raw.estado
-    };
+  public getCoordinatorDashboard(): Observable<CoordinatorDashboardResponse> {
+    return this.http.get<any>(this.dashboardUrl).pipe(
+      map(res => ({
+        kpis: {
+          totalEstudiantesActivos: res.kpis?.total_estudiantes_activos ?? 0,
+          totalTutorias: res.kpis?.total_tutorias ?? 0,
+          totalAcuerdosPendientes: res.kpis?.total_acuerdos_pendientes ?? 0,
+          totalAcuerdosVencidos: res.kpis?.total_acuerdos_vencidos ?? 0,
+          totalPublicaciones: res.kpis?.total_publicaciones ?? 0,
+          totalEventos: res.kpis?.total_eventos ?? 0,
+          totalEstancias: res.kpis?.total_estancias ?? 0
+        },
+        casosAtencion: (res.casos_atencion || []).map((c: any) => ({
+          studentId: c.student_id,
+          matricula: c.matricula,
+          nombreCompleto: c.nombre_completo,
+          cohorte: c.cohorte,
+          semestreActual: c.semestre_actual,
+          asesorPrincipal: c.asesor_principal,
+          fechaUltimaTutoria: c.fecha_ultima_tutoria,
+          diasSinTutoria: c.dias_sin_tutoria,
+          acuerdosVencidosCount: c.acuerdos_vencidos_count,
+          porcentajeTesis: c.porcentaje_tesis,
+          nivelRiesgo: c.nivel_riesgo,
+          motivosRiesgo: c.motivos_riesgo || []
+        })),
+        distribucionTesisCohorte: (res.distribucion_tesis_cohorte || []).map((d: any) => ({
+          cohorte: d.cohorte,
+          totalEstudiantes: d.total_estudiantes,
+          promedioAvanceTesis: d.promedio_avance_tesis
+        }))
+      }))
+    );
   }
 }

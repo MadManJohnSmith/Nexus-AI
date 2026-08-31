@@ -6,19 +6,23 @@ import { TutoringService } from '../../core/services/tutoring.service';
 import { AgreementService } from '../../core/services/agreement.service';
 import { ThesisService } from '../../core/services/thesis.service';
 import { EvidenceService } from '../../core/services/evidence.service';
+import { AcademicOutputService } from '../../core/services/academic-output.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Student } from '../../core/models/student.models';
 import { TutoringSession } from '../../core/models/tutoring.models';
 import { Agreement } from '../../core/models/agreement.models';
 import { ThesisProgress } from '../../core/models/thesis.models';
 import { Evidence } from '../../core/models/evidence.models';
+import { Publication, AcademicEvent, ResearchStay, OtherProduct } from '../../core/models/academic-output.models';
 import { PillBadgeComponent } from '../../shared/components/pill-badge/pill-badge.component';
 import { TutoringModalComponent } from '../tutoring/tutoring-modal.component';
 import { AgreementDrawerComponent } from '../agreements/agreement-drawer.component';
 import { ThesisProgressFormComponent } from '../thesis/thesis-progress-form.component';
+import { ThesisHistoryComparisonComponent } from '../thesis/thesis-history-comparison.component';
 import { EvidenceDropzoneComponent } from '../evidence/evidence-dropzone.component';
+import { AcademicOutputPanelComponent } from '../academic-output/academic-output-panel.component';
 
-export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis' | 'evidencias';
+export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis' | 'evidencias' | 'produccion';
 
 @Component({
   selector: 'nexus-student-overview',
@@ -30,7 +34,9 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
     TutoringModalComponent,
     AgreementDrawerComponent,
     ThesisProgressFormComponent,
-    EvidenceDropzoneComponent
+    ThesisHistoryComparisonComponent,
+    EvidenceDropzoneComponent,
+    AcademicOutputPanelComponent
   ],
   template: `
     <div class="expediente-container">
@@ -121,6 +127,14 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
             (click)="selectTab('tesis')">
             <span class="tab-icon">📊</span>
             <span>Avance de Tesis ({{ latestThesisProgress() ? latestThesisProgress()!.porcentajeAvance + '%' : '0%' }})</span>
+          </button>
+          <button 
+            type="button" 
+            class="tab-btn" 
+            [class.active]="activeTab() === 'produccion'"
+            (click)="selectTab('produccion')">
+            <span class="tab-icon">🎓</span>
+            <span>Producción Académica ({{ publicationsList().length + eventsList().length }})</span>
           </button>
           <button 
             type="button" 
@@ -310,32 +324,24 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
 
             @if (activeTab() === 'tesis') {
               <div class="tab-col-flow">
+                <!-- Comparativa Histórica de Tesis por Semestre (HU-16) -->
+                <nexus-thesis-history-comparison [studentId]="currentStudent()?.id || null">
+                </nexus-thesis-history-comparison>
+
                 <!-- Formulario de Avance con Slider y Acordeón -->
                 <nexus-thesis-progress-form
                   [student]="currentStudent()"
-                  (progressSaved)="loadExpediente()">
+                  (progressSaved)="onThesisProgressSaved()">
                 </nexus-thesis-progress-form>
-
-                <!-- Historial de Avances Registrados -->
-                <section class="content-card">
-                  <div class="card-header-row">
-                    <h3 class="card-title">Historial de Evaluaciones de Tesis</h3>
-                  </div>
-                  <div class="card-body">
-                    @for (tp of thesisProgressList(); track tp.id) {
-                      <div class="thesis-hist-card">
-                        <div class="hist-head">
-                          <strong>Semestre {{ tp.semesterNumero }} — {{ tp.porcentajeAvance }}% de Avance</strong>
-                          <span class="hist-date">📅 {{ tp.fechaRegistro }}</span>
-                        </div>
-                        <p class="hist-obs">{{ tp.observaciones || 'Sin observaciones adicionales.' }}</p>
-                      </div>
-                    } @empty {
-                      <p class="empty-hint">No hay evaluaciones de tesis previas registradas.</p>
-                    }
-                  </div>
-                </section>
               </div>
+            }
+
+            @if (activeTab() === 'produccion') {
+              <!-- Panel de Producción Científica, Congresos y Estancias (HU-17, HU-18, HU-19, HU-20) -->
+              <nexus-academic-output-panel
+                [student]="currentStudent()"
+                (itemCreated)="loadAllStudentData(currentStudent()!.id)">
+              </nexus-academic-output-panel>
             }
 
             @if (activeTab() === 'evidencias') {
@@ -673,8 +679,8 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
       gap: 8px;
       background: transparent;
       border: none;
-      padding: 10px 18px;
-      font-size: 0.875rem;
+      padding: 10px 16px;
+      font-size: 0.85rem;
       font-weight: 600;
       color: var(--color-text-muted);
       cursor: pointer;
@@ -1157,32 +1163,6 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
       color: var(--color-text-main);
     }
 
-    .thesis-hist-card {
-      background-color: #F8F9FC;
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
-      padding: 12px 16px;
-      margin-bottom: 10px;
-    }
-
-    .hist-head {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.85rem;
-      color: var(--color-text-main);
-      margin-bottom: 4px;
-    }
-
-    .hist-date {
-      font-size: 0.75rem;
-      color: var(--color-text-muted);
-    }
-
-    .hist-obs {
-      font-size: 0.8rem;
-      color: var(--color-text-muted);
-    }
-
     .evidence-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -1257,6 +1237,7 @@ export class StudentOverviewComponent implements OnInit {
   private agreementService = inject(AgreementService);
   private thesisService = inject(ThesisService);
   private evidenceService = inject(EvidenceService);
+  private academicService = inject(AcademicOutputService);
   public authService = inject(AuthService);
 
   public isLoading = signal<boolean>(true);
@@ -1265,6 +1246,8 @@ export class StudentOverviewComponent implements OnInit {
   public agreementsList = signal<Agreement[]>([]);
   public thesisProgressList = signal<ThesisProgress[]>([]);
   public evidencesList = signal<Evidence[]>([]);
+  public publicationsList = signal<Publication[]>([]);
+  public eventsList = signal<AcademicEvent[]>([]);
   public activeTab = signal<TabType>('resumen');
   public selectedSemesterNum = signal<number>(1);
 
@@ -1336,6 +1319,14 @@ export class StudentOverviewComponent implements OnInit {
       next: (thRes) => this.thesisProgressList.set(thRes.results)
     });
 
+    this.academicService.getPublications(studentId).subscribe({
+      next: (pubRes) => this.publicationsList.set(pubRes.results)
+    });
+
+    this.academicService.getAcademicEvents(studentId).subscribe({
+      next: (evRes) => this.eventsList.set(evRes.results)
+    });
+
     this.evidenceService.getEvidences(studentId).subscribe({
       next: (evRes) => {
         this.evidencesList.set(evRes.results);
@@ -1385,6 +1376,11 @@ export class StudentOverviewComponent implements OnInit {
 
   public onAgreementUpdated(): void {
     this.showAgreementDrawer = false;
+    const student = this.currentStudent();
+    if (student) this.loadAllStudentData(student.id);
+  }
+
+  public onThesisProgressSaved(): void {
     const student = this.currentStudent();
     if (student) this.loadAllStudentData(student.id);
   }

@@ -1,48 +1,79 @@
 import { Injectable, inject } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient } from '@angular/common/http';
 import { Observable, map } from 'rxjs';
-import { ThesisProgress, ThesisComponents } from '../models/thesis.models';
-import { PaginatedResponse } from '../models/student.models';
+import { ThesisProgress, ThesisHistoryResponse } from '../models/thesis.models';
+
+interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
 
 @Injectable({
   providedIn: 'root'
 })
 export class ThesisService {
   private http = inject(HttpClient);
-  private readonly API_URL = '/api/v2/thesis-progress';
+  private apiUrl = '/api/v2/thesis-progress/';
 
   public getProgressList(studentId?: number, semesterId?: number): Observable<PaginatedResponse<ThesisProgress>> {
-    let params = new HttpParams();
-    if (studentId) params = params.set('student', studentId.toString());
-    if (semesterId) params = params.set('semester', semesterId.toString());
-
-    return this.http.get<any>(`${this.API_URL}/`, { params }).pipe(
+    let params: any = {};
+    if (studentId) params.student = studentId;
+    if (semesterId) params.semester = semesterId;
+    return this.http.get<any>(this.apiUrl, { params }).pipe(
       map(res => ({
-        count: res.count,
-        next: res.next,
-        previous: res.previous,
-        results: (res.results || []).map(this.mapProgressFromApi)
+        ...res,
+        results: (res.results || []).map((p: any) => this.mapProgress(p))
       }))
     );
   }
 
-  public registerProgress(payload: {
+  public getThesisHistory(studentId: number): Observable<ThesisHistoryResponse> {
+    return this.http.get<any>(`${this.apiUrl}history/`, { params: { student_id: studentId } }).pipe(
+      map(res => ({
+        studentId: res.student_id,
+        studentNombre: res.student_nombre,
+        studentMatricula: res.student_matricula,
+        semestersHistory: (res.semesters_history || []).map((h: any) => ({
+          semesterNumero: h.semester_numero,
+          semesterId: h.semester_id,
+          hasData: h.has_data,
+          porcentajeAvance: h.porcentaje_avance,
+          fechaRegistro: h.fecha_registro,
+          observaciones: h.observaciones,
+          componentesJson: {
+            protocolo: h.componentes_json?.protocolo ?? 0,
+            estadoArte: h.componentes_json?.estado_arte ?? h.componentes_json?.estadoArte ?? 0,
+            marcoTeorico: h.componentes_json?.marco_teorico ?? h.componentes_json?.marcoTeorico ?? 0,
+            metodologia: h.componentes_json?.metodologia ?? 0,
+            analisis: h.componentes_json?.analisis ?? 0,
+            redaccion: h.componentes_json?.redaccion ?? 0
+          },
+          registradoPorNombre: h.registrado_por_nombre
+        }))
+      }))
+    );
+  }
+
+  public createProgress(data: {
     student: number;
     semester: number;
-    porcentaje_avance: number;
-    componentes_json: ThesisComponents;
-    observaciones?: string;
-  }): Observable<{ thesisProgressCreatedId: number; mensaje: string; thesisProgress: ThesisProgress }> {
-    return this.http.post<any>(`${this.API_URL}/`, payload).pipe(
-      map(res => ({
-        thesisProgressCreatedId: res.thesis_progress_created_id,
-        mensaje: res.mensaje,
-        thesisProgress: this.mapProgressFromApi(res.thesis_progress)
-      }))
-    );
+    porcentajeAvance: number;
+    componentesJson?: any;
+    observaciones: string;
+  }): Observable<any> {
+    const payload = {
+      student: data.student,
+      semester: data.semester,
+      porcentaje_avance: data.porcentajeAvance,
+      componentes_json: data.componentesJson,
+      observaciones: data.observaciones
+    };
+    return this.http.post<any>(this.apiUrl, payload);
   }
 
-  private mapProgressFromApi(raw: any): ThesisProgress {
+  private mapProgress(raw: any): ThesisProgress {
     return {
       id: raw.id,
       student: raw.student,
@@ -51,18 +82,11 @@ export class ThesisService {
       semester: raw.semester,
       semesterNumero: raw.semester_numero,
       porcentajeAvance: raw.porcentaje_avance,
-      componentesJson: raw.componentes_json || {
-        protocolo: 0,
-        estado_arte: 0,
-        marco_teorico: 0,
-        metodologia: 0,
-        analisis: 0,
-        redaccion: 0
-      },
-      observaciones: raw.observaciones || '',
-      fechaRegistro: raw.fecha_registro,
+      componentesJson: raw.componentes_json,
+      observaciones: raw.observaciones,
       registradoPor: raw.registrado_por,
       registradoPorNombre: raw.registrado_por_nombre,
+      fechaRegistro: raw.fecha_registro,
       createdAt: raw.created_at,
       updatedAt: raw.updated_at
     };

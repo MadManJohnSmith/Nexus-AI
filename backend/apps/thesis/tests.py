@@ -11,6 +11,13 @@ from apps.thesis.models import ThesisProgress
 class ThesisProgressTests(TestCase):
     def setUp(self):
         self.client = APIClient()
+        self.coordinator = CustomUser.objects.create_user(
+            email='coord@posgrado.edu',
+            password='Pass123!Password',
+            first_name='Elena',
+            last_name='Coordinadora',
+            role=CustomUser.Role.COORDINADOR
+        )
         self.advisor = CustomUser.objects.create_user(
             email='asesor@posgrado.edu',
             password='Pass123!Password',
@@ -38,6 +45,13 @@ class ThesisProgressTests(TestCase):
             numero=1,
             fecha_inicio=date(2024, 1, 15),
             fecha_fin=date(2024, 6, 30),
+            is_active=False
+        )
+        self.semester_2 = Semester.objects.create(
+            student=self.student,
+            numero=2,
+            fecha_inicio=date(2024, 8, 1),
+            fecha_fin=date(2024, 12, 15),
             is_active=True
         )
         AcademicCommittee.objects.create(
@@ -79,3 +93,37 @@ class ThesisProgressTests(TestCase):
         response = self.client.post(url, invalid_payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('porcentaje_avance', response.data)
+
+    def test_thesis_history_hu_16(self):
+        ThesisProgress.objects.create(
+            student=self.student,
+            semester=self.semester_1,
+            porcentaje_avance=25,
+            observaciones='Evaluación Semestre 1'
+        )
+        ThesisProgress.objects.create(
+            student=self.student,
+            semester=self.semester_2,
+            porcentaje_avance=50,
+            observaciones='Evaluación Semestre 2'
+        )
+
+        self.client.force_authenticate(user=self.coordinator)
+        url = reverse('thesis-progress-history') + f"?student_id={self.student.id}"
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data['semesters_history']), 6)
+        
+        # Verificar semestre 1 y 2
+        sem1 = response.data['semesters_history'][0]
+        self.assertTrue(sem1['has_data'])
+        self.assertEqual(sem1['porcentaje_avance'], 25)
+
+        sem2 = response.data['semesters_history'][1]
+        self.assertTrue(sem2['has_data'])
+        self.assertEqual(sem2['porcentaje_avance'], 50)
+
+        # Verificar semestre 3 sin datos
+        sem3 = response.data['semesters_history'][2]
+        self.assertFalse(sem3['has_data'])
+        self.assertEqual(sem3['porcentaje_avance'], 0)
