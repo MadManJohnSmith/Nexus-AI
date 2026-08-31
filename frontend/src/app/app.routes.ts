@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { LoginComponent } from './features/auth/login.component';
 import { StudentOverviewComponent } from './features/student-overview/student-overview.component';
 import { AgreementsListComponent } from './features/agreements/agreements-list.component';
+import { TimelineViewComponent } from './features/timeline/timeline-view.component';
 import { AppShellComponent } from './shared/components/app-shell/app-shell.component';
 import { authGuard } from './core/guards/auth.guard';
 
@@ -33,16 +34,16 @@ export const routes: Routes = [
         component: AgreementsListComponent
       },
       {
+        path: 'timeline',
+        component: TimelineViewComponent
+      },
+      {
         path: 'thesis',
-        component: StudentOverviewComponent // Sprint 3
+        component: StudentOverviewComponent
       },
       {
         path: 'evidence',
-        component: StudentOverviewComponent // Sprint 3
-      },
-      {
-        path: 'timeline',
-        component: StudentOverviewComponent // Sprint 4
+        component: StudentOverviewComponent
       },
       {
         path: 'reports',

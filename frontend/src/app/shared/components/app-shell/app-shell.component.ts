@@ -1,7 +1,9 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, signal, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { AuthService } from '../../../core/services/auth.service';
+import { MonitoringService } from '../../../core/services/monitoring.service';
+import { AlertsResponse } from '../../../core/models/monitoring.models';
 import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
 
 @Component({
@@ -67,28 +69,16 @@ import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
               </a>
             </li>
             <li>
-              <a routerLink="/thesis" routerLinkActive="active" class="nav-link">
-                <span class="nav-icon">📊</span>
-                <span class="nav-text">Avance de Tesis</span>
-              </a>
-            </li>
-            <li>
-              <a routerLink="/evidence" routerLinkActive="active" class="nav-link">
-                <span class="nav-icon">📎</span>
-                <span class="nav-text">Evidencias y Productos</span>
+              <a routerLink="/timeline" routerLinkActive="active" class="nav-link">
+                <span class="nav-icon">⏱️</span>
+                <span class="nav-text">Línea de Tiempo Longitudinal</span>
               </a>
             </li>
           </ul>
 
           @if (authService.isCoordinator() || authService.isAdvisor()) {
-            <div class="nav-section-title">GESTIÓN Y MÉTRICAS</div>
+            <div class="nav-section-title">GESTIÓN Y REPORTES</div>
             <ul class="nav-list">
-              <li>
-                <a routerLink="/timeline" routerLinkActive="active" class="nav-link">
-                  <span class="nav-icon">⏱️</span>
-                  <span class="nav-text">Línea de Tiempo</span>
-                </a>
-              </li>
               <li>
                 <a routerLink="/reports" routerLinkActive="active" class="nav-link">
                   <span class="nav-icon">📄</span>
@@ -128,6 +118,50 @@ import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
           </div>
 
           <div class="navbar-actions">
+            <!-- Campana de Notificaciones Reactiva (HU-25) -->
+            <div class="notification-wrapper">
+              <button type="button" class="btn-bell" (click)="toggleAlertsDropdown()" title="Alertas de compromisos">
+                <span class="bell-icon">🔔</span>
+                @if (alertsData() && alertsData()!.totalAlertas > 0) {
+                  <span class="bell-counter">{{ alertsData()!.totalAlertas }}</span>
+                }
+              </button>
+
+              @if (showAlertsDropdown()) {
+                <div class="alerts-dropdown">
+                  <div class="dropdown-header">
+                    <h4>Alertas de Compromisos</h4>
+                    <span class="alert-sub">{{ alertsData()?.totalAlertas || 0 }} requieren atención</span>
+                  </div>
+                  <div class="alerts-list">
+                    @for (item of alertsData()?.alertasVencidas || []; track item.id) {
+                      <div class="alert-item alert-vencido" (click)="goToAgreements()">
+                        <span class="alert-dot red"></span>
+                        <div class="alert-info">
+                          <strong>{{ item.descripcion }}</strong>
+                          <span>Venció el {{ item.fechaLimite }} • {{ item.studentNombre }}</span>
+                        </div>
+                      </div>
+                    }
+                    @for (item of alertsData()?.alertasPorVencer || []; track item.id) {
+                      <div class="alert-item alert-por-vencer" (click)="goToAgreements()">
+                        <span class="alert-dot amber"></span>
+                        <div class="alert-info">
+                          <strong>{{ item.descripcion }}</strong>
+                          <span>Vence en {{ item.diasRestantes }} días ({{ item.fechaLimite }})</span>
+                        </div>
+                      </div>
+                    }
+                    @if (!alertsData() || alertsData()!.totalAlertas === 0) {
+                      <div class="empty-alerts">
+                        <span>✅ No hay acuerdos en riesgo ni vencidos.</span>
+                      </div>
+                    }
+                  </div>
+                </div>
+              }
+            </div>
+
             <div class="search-box">
               <span class="search-icon">🔍</span>
               <input 
@@ -138,7 +172,7 @@ import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
             </div>
             <div class="system-status">
               <span class="status-indicator"></span>
-              <span class="status-text">Ciclo 2025-A Conectado</span>
+              <span class="status-text">MVP Longitudinal Activo</span>
             </div>
           </div>
         </header>
@@ -157,7 +191,6 @@ import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
       background-color: var(--color-bg-app);
     }
 
-    /* Sidebar */
     .nexus-sidebar {
       width: 280px;
       min-width: 280px;
@@ -355,7 +388,6 @@ import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
       border-color: var(--color-danger);
     }
 
-    /* Main Area */
     .nexus-main-wrapper {
       flex: 1;
       display: flex;
@@ -403,6 +435,133 @@ import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
       gap: 20px;
     }
 
+    /* Notification Bell */
+    .notification-wrapper {
+      position: relative;
+    }
+
+    .btn-bell {
+      background: #FAFAFB;
+      border: 1px solid var(--color-border);
+      border-radius: 50%;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      position: relative;
+      transition: all 0.2s;
+    }
+
+    .btn-bell:hover {
+      background-color: var(--color-primary-light);
+      border-color: var(--color-primary);
+    }
+
+    .bell-icon {
+      font-size: 1rem;
+    }
+
+    .bell-counter {
+      position: absolute;
+      top: -4px;
+      right: -4px;
+      background-color: var(--color-danger);
+      color: #FFFFFF;
+      font-size: 0.65rem;
+      font-weight: 800;
+      border-radius: 9999px;
+      padding: 1px 5px;
+      border: 2px solid #FFFFFF;
+    }
+
+    .alerts-dropdown {
+      position: absolute;
+      top: 46px;
+      right: 0;
+      width: 320px;
+      background-color: #FFFFFF;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg);
+      z-index: 200;
+      animation: dropFade 0.15s ease-out;
+    }
+
+    @keyframes dropFade {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .dropdown-header {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--color-border);
+      background-color: #F8F9FC;
+    }
+
+    .dropdown-header h4 {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--color-text-main);
+    }
+
+    .alert-sub {
+      font-size: 0.7rem;
+      color: var(--color-text-muted);
+    }
+
+    .alerts-list {
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .alert-item {
+      padding: 10px 14px;
+      border-bottom: 1px solid #F2F4F7;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+
+    .alert-item:hover {
+      background-color: #F8F9FC;
+    }
+
+    .alert-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 4px;
+    }
+
+    .alert-dot.red { background-color: var(--color-danger); }
+    .alert-dot.amber { background-color: #F59E0B; }
+
+    .alert-info {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 0.75rem;
+    }
+
+    .alert-info strong {
+      color: var(--color-text-main);
+    }
+
+    .alert-info span {
+      color: var(--color-text-muted);
+    }
+
+    .empty-alerts {
+      padding: 16px;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+    }
+
     .search-box {
       display: flex;
       align-items: center;
@@ -446,14 +605,32 @@ import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
     }
   `]
 })
-export class AppShellComponent {
+export class AppShellComponent implements OnInit {
   public authService = inject(AuthService);
+  private monitoringService = inject(MonitoringService);
   private router = inject(Router);
 
   public currentMode = signal<'expediente' | 'coordinacion'>('expediente');
+  public alertsData = signal<AlertsResponse | null>(null);
+  public showAlertsDropdown = signal<boolean>(false);
+
+  ngOnInit(): void {
+    this.monitoringService.getAlerts().subscribe({
+      next: (res) => this.alertsData.set(res)
+    });
+  }
 
   public setMode(mode: 'expediente' | 'coordinacion') {
     this.currentMode.set(mode);
+  }
+
+  public toggleAlertsDropdown(): void {
+    this.showAlertsDropdown.set(!this.showAlertsDropdown());
+  }
+
+  public goToAgreements(): void {
+    this.showAlertsDropdown.set(false);
+    this.router.navigate(['/agreements']);
   }
 
   public getBreadcrumb(): string {
@@ -461,9 +638,7 @@ export class AppShellComponent {
     if (url.includes('student-overview')) return 'Expediente Longitudinal del Doctorando';
     if (url.includes('tutoring')) return 'Módulo de Tutorías y Asesorías';
     if (url.includes('agreements')) return 'Seguimiento de Acuerdos';
-    if (url.includes('thesis')) return 'Avance de Investigación de Tesis';
-    if (url.includes('evidence')) return 'Repositorio de Evidencias';
-    if (url.includes('timeline')) return 'Línea de Tiempo Longitudinal';
+    if (url.includes('timeline')) return 'Línea de Tiempo Longitudinal (MVP)';
     if (url.includes('reports')) return 'Reportes Integrales de Posgrado';
     return 'Panel Principal';
   }

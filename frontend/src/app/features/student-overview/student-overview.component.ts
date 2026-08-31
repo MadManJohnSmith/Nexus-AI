@@ -4,20 +4,34 @@ import { FormsModule } from '@angular/forms';
 import { StudentService } from '../../core/services/student.service';
 import { TutoringService } from '../../core/services/tutoring.service';
 import { AgreementService } from '../../core/services/agreement.service';
+import { ThesisService } from '../../core/services/thesis.service';
+import { EvidenceService } from '../../core/services/evidence.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Student } from '../../core/models/student.models';
 import { TutoringSession } from '../../core/models/tutoring.models';
 import { Agreement } from '../../core/models/agreement.models';
+import { ThesisProgress } from '../../core/models/thesis.models';
+import { Evidence } from '../../core/models/evidence.models';
 import { PillBadgeComponent } from '../../shared/components/pill-badge/pill-badge.component';
 import { TutoringModalComponent } from '../tutoring/tutoring-modal.component';
 import { AgreementDrawerComponent } from '../agreements/agreement-drawer.component';
+import { ThesisProgressFormComponent } from '../thesis/thesis-progress-form.component';
+import { EvidenceDropzoneComponent } from '../evidence/evidence-dropzone.component';
 
 export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis' | 'evidencias';
 
 @Component({
   selector: 'nexus-student-overview',
   standalone: true,
-  imports: [CommonModule, FormsModule, PillBadgeComponent, TutoringModalComponent, AgreementDrawerComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    PillBadgeComponent,
+    TutoringModalComponent,
+    AgreementDrawerComponent,
+    ThesisProgressFormComponent,
+    EvidenceDropzoneComponent
+  ],
   template: `
     <div class="expediente-container">
       <!-- Loading State -->
@@ -98,7 +112,23 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
             [class.active]="activeTab() === 'acuerdos'"
             (click)="selectTab('acuerdos')">
             <span class="tab-icon">📝</span>
-            <span>Acuerdos y Compromisos ({{ agreementsList().length }})</span>
+            <span>Acuerdos ({{ agreementsList().length }})</span>
+          </button>
+          <button 
+            type="button" 
+            class="tab-btn" 
+            [class.active]="activeTab() === 'tesis'"
+            (click)="selectTab('tesis')">
+            <span class="tab-icon">📊</span>
+            <span>Avance de Tesis ({{ latestThesisProgress() ? latestThesisProgress()!.porcentajeAvance + '%' : '0%' }})</span>
+          </button>
+          <button 
+            type="button" 
+            class="tab-btn" 
+            [class.active]="activeTab() === 'evidencias'"
+            (click)="selectTab('evidencias')">
+            <span class="tab-icon">📎</span>
+            <span>Evidencias ({{ evidencesList().length }})</span>
           </button>
           <button 
             type="button" 
@@ -107,22 +137,6 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
             (click)="selectTab('semestres')">
             <span class="tab-icon">📅</span>
             <span>Semestres 1 a 6</span>
-          </button>
-          <button 
-            type="button" 
-            class="tab-btn" 
-            [class.active]="activeTab() === 'tesis'"
-            (click)="selectTab('tesis')">
-            <span class="tab-icon">📊</span>
-            <span>Tesis Doctoral</span>
-          </button>
-          <button 
-            type="button" 
-            class="tab-btn" 
-            [class.active]="activeTab() === 'evidencias'"
-            (click)="selectTab('evidencias')">
-            <span class="tab-icon">📎</span>
-            <span>Evidencias</span>
           </button>
         </div>
 
@@ -294,6 +308,75 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
               </section>
             }
 
+            @if (activeTab() === 'tesis') {
+              <div class="tab-col-flow">
+                <!-- Formulario de Avance con Slider y Acordeón -->
+                <nexus-thesis-progress-form
+                  [student]="currentStudent()"
+                  (progressSaved)="loadExpediente()">
+                </nexus-thesis-progress-form>
+
+                <!-- Historial de Avances Registrados -->
+                <section class="content-card">
+                  <div class="card-header-row">
+                    <h3 class="card-title">Historial de Evaluaciones de Tesis</h3>
+                  </div>
+                  <div class="card-body">
+                    @for (tp of thesisProgressList(); track tp.id) {
+                      <div class="thesis-hist-card">
+                        <div class="hist-head">
+                          <strong>Semestre {{ tp.semesterNumero }} — {{ tp.porcentajeAvance }}% de Avance</strong>
+                          <span class="hist-date">📅 {{ tp.fechaRegistro }}</span>
+                        </div>
+                        <p class="hist-obs">{{ tp.observaciones || 'Sin observaciones adicionales.' }}</p>
+                      </div>
+                    } @empty {
+                      <p class="empty-hint">No hay evaluaciones de tesis previas registradas.</p>
+                    }
+                  </div>
+                </section>
+              </div>
+            }
+
+            @if (activeTab() === 'evidencias') {
+              <div class="tab-col-flow">
+                <!-- Dropzone y DOI Register Component -->
+                <nexus-evidence-dropzone
+                  [student]="currentStudent()"
+                  (evidenceSaved)="loadExpediente()">
+                </nexus-evidence-dropzone>
+
+                <!-- Listado de Evidencias Subidas -->
+                <section class="content-card">
+                  <div class="card-header-row">
+                    <h3 class="card-title">Repositorio de Evidencias y Productos</h3>
+                  </div>
+                  <div class="card-body">
+                    <div class="evidence-grid">
+                      @for (ev of evidencesList(); track ev.id) {
+                        <div class="evidence-card-item">
+                          <div class="ev-type-badge">
+                            <span>{{ ev.tipo === 'ARCHIVO_LOCAL' ? '📁 Archivo' : '🌐 DOI' }}</span>
+                            <span class="ev-sem">Sem {{ ev.semesterNumero }}</span>
+                          </div>
+                          <h4 class="ev-title">{{ ev.descripcion }}</h4>
+                          <span class="ev-sub">Cargado el {{ ev.fechaCarga | date:'shortDate' }} por {{ ev.cargadoPorNombre || 'Estudiante' }}</span>
+                          @if (ev.archivoUrl) {
+                            <a [href]="ev.archivoUrl" target="_blank" class="ev-link">📥 Descargar Archivo</a>
+                          }
+                          @if (ev.urlDoi) {
+                            <a [href]="ev.urlDoi" target="_blank" class="ev-link">🌐 Abrir DOI</a>
+                          }
+                        </div>
+                      } @empty {
+                        <p class="empty-hint">No hay evidencias registradas en el expediente.</p>
+                      }
+                    </div>
+                  </div>
+                </section>
+              </div>
+            }
+
             @if (activeTab() === 'semestres') {
               <!-- Selector de Semestres 1 a 6 -->
               <section class="content-card">
@@ -344,31 +427,6 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
                       </div>
                     }
                   </div>
-                </div>
-              </section>
-            }
-
-            @if (activeTab() === 'tesis') {
-              <section class="content-card">
-                <div class="card-header-row">
-                  <h3 class="card-title">Avance de Proyecto de Tesis Doctoral</h3>
-                  <nexus-pill-badge variant="EN_PROCESO" label="En Desarrollo"></nexus-pill-badge>
-                </div>
-                <div class="card-body">
-                  <p class="section-desc">
-                    Título: <strong>"Arquitectura de Agentes Inteligentes Autónomos para la Trazabilidad Longitudinal en Posgrados de Alto Impacto"</strong>
-                  </p>
-                </div>
-              </section>
-            }
-
-            @if (activeTab() === 'evidencias') {
-              <section class="content-card">
-                <div class="card-header-row">
-                  <h3 class="card-title">Repositorio de Evidencias</h3>
-                </div>
-                <div class="card-body">
-                  <p class="empty-hint">El módulo especializado de evidencias se completará en el Sprint 3.</p>
                 </div>
               </section>
             }
@@ -602,7 +660,6 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
       background-color: var(--color-primary-light);
     }
 
-    /* Tabs Bar */
     .tabs-bar {
       display: flex;
       gap: 8px;
@@ -642,7 +699,6 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
       border-radius: 3px 3px 0 0;
     }
 
-    /* Modular Grid 70/30 */
     .modular-grid {
       display: grid;
       grid-template-columns: 7fr 3fr;
@@ -656,6 +712,12 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
     }
 
     .sidebar-column-30 {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .tab-col-flow {
       display: flex;
       flex-direction: column;
       gap: 20px;
@@ -732,7 +794,6 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
       color: var(--color-primary);
     }
 
-    /* Agreements Table */
     .nexus-table {
       width: 100%;
       border-collapse: collapse;
@@ -778,7 +839,6 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
       cursor: pointer;
     }
 
-    /* Sessions Timeline */
     .sessions-timeline {
       display: flex;
       flex-direction: column;
@@ -869,7 +929,6 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
       font-size: 0.775rem;
     }
 
-    /* Widget de Acuerdos Lateral */
     .widget-card {
       background-color: #FFFFFF;
       border-radius: var(--radius-md);
@@ -899,12 +958,6 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
       border-radius: 9999px;
       font-size: 0.7rem;
       font-weight: 700;
-      animation: pulse 2s infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.7; }
     }
 
     .widget-stats-row {
@@ -954,7 +1007,6 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
       color: #FFFFFF;
     }
 
-    /* Committee Sidebar Card */
     .committee-card {
       background-color: #FFFFFF;
       border-radius: var(--radius-md);
@@ -1105,6 +1157,81 @@ export type TabType = 'resumen' | 'semestres' | 'tutorias' | 'acuerdos' | 'tesis
       color: var(--color-text-main);
     }
 
+    .thesis-hist-card {
+      background-color: #F8F9FC;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px;
+      margin-bottom: 10px;
+    }
+
+    .hist-head {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: var(--color-text-main);
+      margin-bottom: 4px;
+    }
+
+    .hist-date {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+    }
+
+    .hist-obs {
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+    }
+
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .evidence-card-item {
+      background-color: #F8F9FC;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .ev-type-badge {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--color-primary);
+    }
+
+    .ev-sem {
+      background-color: var(--color-primary-light);
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .ev-title {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--color-text-main);
+    }
+
+    .ev-sub {
+      font-size: 0.7rem;
+      color: var(--color-text-muted);
+    }
+
+    .ev-link {
+      font-size: 0.75rem;
+      color: var(--color-primary);
+      font-weight: 600;
+      text-decoration: underline;
+      margin-top: 4px;
+    }
+
     .empty-hint, .empty-state, .empty-semester-state {
       font-size: 0.825rem;
       color: var(--color-text-muted);
@@ -1128,12 +1255,16 @@ export class StudentOverviewComponent implements OnInit {
   private studentService = inject(StudentService);
   private tutoringService = inject(TutoringService);
   private agreementService = inject(AgreementService);
+  private thesisService = inject(ThesisService);
+  private evidenceService = inject(EvidenceService);
   public authService = inject(AuthService);
 
   public isLoading = signal<boolean>(true);
   public currentStudent = signal<Student | null>(null);
   public tutoringSessions = signal<TutoringSession[]>([]);
   public agreementsList = signal<Agreement[]>([]);
+  public thesisProgressList = signal<ThesisProgress[]>([]);
+  public evidencesList = signal<Evidence[]>([]);
   public activeTab = signal<TabType>('resumen');
   public selectedSemesterNum = signal<number>(1);
 
@@ -1149,6 +1280,11 @@ export class StudentOverviewComponent implements OnInit {
   public selectedSemesterData = computed(() => {
     const sems = this.currentStudent()?.semesters || [];
     return sems.find(s => s.numero === this.selectedSemesterNum()) || null;
+  });
+
+  public latestThesisProgress = computed(() => {
+    const list = this.thesisProgressList();
+    return list.length > 0 ? list[0] : null;
   });
 
   public pendingCount = computed(() => this.agreementsList().filter(a => a.estado === 'PENDIENTE').length);
@@ -1170,11 +1306,11 @@ export class StudentOverviewComponent implements OnInit {
             next: (detailed) => {
               this.currentStudent.set(detailed);
               this.selectedSemesterNum.set(detailed.semestreActual);
-              this.loadTutoringAndAgreements(studentId);
+              this.loadAllStudentData(studentId);
             },
             error: () => {
               this.currentStudent.set(res.results[0]);
-              this.loadTutoringAndAgreements(studentId);
+              this.loadAllStudentData(studentId);
             }
           });
         } else {
@@ -1187,14 +1323,22 @@ export class StudentOverviewComponent implements OnInit {
     });
   }
 
-  public loadTutoringAndAgreements(studentId: number): void {
+  public loadAllStudentData(studentId: number): void {
     this.tutoringService.getSessions(studentId).subscribe({
       next: (sessRes) => this.tutoringSessions.set(sessRes.results)
     });
 
     this.agreementService.getAgreements({ student: studentId }).subscribe({
-      next: (agrRes) => {
-        this.agreementsList.set(agrRes.results);
+      next: (agrRes) => this.agreementsList.set(agrRes.results)
+    });
+
+    this.thesisService.getProgressList(studentId).subscribe({
+      next: (thRes) => this.thesisProgressList.set(thRes.results)
+    });
+
+    this.evidenceService.getEvidences(studentId).subscribe({
+      next: (evRes) => {
+        this.evidencesList.set(evRes.results);
         this.isLoading.set(false);
       },
       error: () => {
@@ -1236,13 +1380,13 @@ export class StudentOverviewComponent implements OnInit {
   public onTutoringSaved(): void {
     this.showTutoringModal = false;
     const student = this.currentStudent();
-    if (student) this.loadTutoringAndAgreements(student.id);
+    if (student) this.loadAllStudentData(student.id);
   }
 
   public onAgreementUpdated(): void {
     this.showAgreementDrawer = false;
     const student = this.currentStudent();
-    if (student) this.loadTutoringAndAgreements(student.id);
+    if (student) this.loadAllStudentData(student.id);
   }
 
   public openSemesterModal(): void {
