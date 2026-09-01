@@ -4,12 +4,11 @@ import { FormsModule } from '@angular/forms';
 import { StudentService } from '../../core/services/student.service';
 import { ReportingService } from '../../core/services/reporting.service';
 import { FullDossierResponse } from '../../core/models/reporting.models';
-import { PillBadgeComponent } from '../../shared/components/pill-badge/pill-badge.component';
 
 @Component({
   selector: 'nexus-student-dossier-report',
   standalone: true,
-  imports: [CommonModule, FormsModule, PillBadgeComponent],
+  imports: [CommonModule, FormsModule],
   template: `
     <div class="report-wrapper">
       <!-- Barra de Acciones del Reporte (Oculta en Impresión) -->

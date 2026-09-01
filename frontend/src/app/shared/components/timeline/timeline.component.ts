@@ -1,12 +1,11 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { TimelineEvent } from '../../../core/models/monitoring.models';
-import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
 
 @Component({
   selector: 'nexus-timeline',
   standalone: true,
-  imports: [CommonModule, PillBadgeComponent],
+  imports: [CommonModule],
   template: `
     <div class="timeline-container">
       @for (item of events; track item.id; let idx = $index; let isLast = $last) {
@@ -257,9 +256,11 @@ import { PillBadgeComponent } from '../pill-badge/pill-badge.component';
 export class TimelineComponent {
   @Input() events: TimelineEvent[] = [];
   @Output() nodeSelected = new EventEmitter<TimelineEvent>();
+  @Output() selectEvent = new EventEmitter<TimelineEvent>();
 
   public onNodeClick(item: TimelineEvent): void {
     this.nodeSelected.emit(item);
+    this.selectEvent.emit(item);
   }
 
   public getIcon(tipo: string): string {

@@ -3,12 +3,11 @@ import { CommonModule } from '@angular/common';
 import { RouterModule, Router } from '@angular/router';
 import { MonitoringService } from '../../core/services/monitoring.service';
 import { CoordinatorDashboardResponse, CasoAtencion, CohorteDistribucionTesis } from '../../core/models/monitoring.models';
-import { PillBadgeComponent } from '../../shared/components/pill-badge/pill-badge.component';
 
 @Component({
   selector: 'nexus-coordinator-dashboard',
   standalone: true,
-  imports: [CommonModule, RouterModule, PillBadgeComponent],
+  imports: [CommonModule, RouterModule],
   template: `
     <div class="dashboard-layout">
       <!-- Header del Dashboard -->

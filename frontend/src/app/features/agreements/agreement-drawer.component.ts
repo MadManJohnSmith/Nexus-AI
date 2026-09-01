@@ -1,6 +1,6 @@
 import { Component, Input, Output, EventEmitter, inject, signal, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormGroup, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { AgreementService } from '../../core/services/agreement.service';
 import { AuthService } from '../../core/services/auth.service';
 import { Agreement, AgreementState } from '../../core/models/agreement.models';
@@ -10,7 +10,7 @@ import { PillBadgeComponent } from '../../shared/components/pill-badge/pill-badg
 @Component({
   selector: 'nexus-agreement-drawer',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, PillBadgeComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, PillBadgeComponent],
   template: `
     <div class="drawer-backdrop" (click)="onClose()">
       <aside class="drawer-container" (click)="$event.stopPropagation()">

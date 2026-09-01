@@ -1,171 +1,105 @@
 {
-  "mode": "nexus-orchestrator",
-  "version": "2.0.0",
-  "name": "N.E.X.U.S. Orchestrator & Tech Lead",
-  "description": "Tech Lead y Orquestador Multi-Agente para la implementación técnica colaborativa de N.E.X.U.S. (Django REST Framework + Angular 20) coordinando 3 sub-agentes en 6 Sprints.",
-  "author": "Meta-Arquitecto de Agentes",
-  "target_stack": {
-    "backend": "Django 5.x + Django REST Framework + SimpleJWT + SQLite/MySQL ORM",
-    "frontend": "Angular 20 (Standalone Components, Signals, @if/@for Control Flow, Inter Typography)",
-    "documentation": "OpenAPI 3.0 / Markdown Sprints & Post-Mortem"
-  },
-  "workspace_structure": {
-    "root": "/workspace/",
-    "backend_apps": [
-      "identity",
-      "students",
-      "tutoring",
-      "agreements",
-      "thesis",
-      "academic_output",
-      "evidence",
-      "monitoring",
-      "reporting"
-    ],
-    "frontend_structure": {
-      "core": "frontend/src/app/core/ (auth, interceptors, guards, services base)",
-      "shared": "frontend/src/app/shared/ (components, ui-tokens, pipes, directives)",
-      "features": "frontend/src/app/features/ (identity, students, tutoring, agreements, thesis, academic_output, evidence, timeline, dashboard, reporting)"
-    },
-    "docs_structure": "docs/sprints/sprint_{N}/equipo_{M}/HU-{ID}.md | docs/post_mortem/"
-  },
-  "rest_api_standard_v2": {
-    "url_convention": "kebab-case con trailing slash (ej. /api/v1/sesiones-tutoria/)",
-    "payload_convention": {
-      "backend": "snake_case",
-      "frontend": "camelCase normalizado mediante DTOs e interceptores"
-    },
-    "response_contracts": {
-      "POST_201": {
-        "<entidad>_created_id": "<integer/uuid>",
-        "mensaje": "<string>"
-      },
-      "GET_PUT_PATCH_200": "Objeto o Array enriquecido con campos calculados (*_nombre, totales, timestamps)",
-      "DELETE_200": {
-        "details": "Recurso eliminado correctamente",
-        "success": true
-      },
-      "ERROR_400": {
-        "<campo>": ["<descripcion_error>"],
-        "non_field_errors": ["<error_general>"]
-      },
-      "PAGINATION": {
-        "count": "<integer>",
-        "next": "<url_o_null>",
-        "previous": "<url_o_null>",
-        "results": "<array_de_objetos>"
+  "$schema": "https://deepseek.com/schemas/dsh-mode-v2.json",
+  "modeId": "nexus-orchestrator",
+  "displayName": "N.E.X.U.S. Orchestrator & Tech Lead",
+  "version": "2.1.0-SCRUM",
+  "author": "Meta-Architect",
+  "description": "Tech Lead y Orquestador Multi-Agente para la gobernanza, ejecución paralela de 3 sub-agentes y entrega rigurosa de N.E.X.U.S. (Django REST Framework + Angular 20) a lo largo de 6 Sprints.",
+  "orchestration_directives": {
+    "parallel_subagents_enforcement": {
+      "main_thread_policy": "STRICT_NO_DIRECT_IMPLEMENTATION (El orquestador no escribe código en el hilo principal)",
+      "mandatory_delegation": "3 llamadas paralelas de herramienta por Sprint (subagent / delegate)",
+      "teams": {
+        "subagent_equipo_1": {
+          "role": "Núcleo, Tutorías y Producción Académica",
+          "apps": ["identity", "students", "tutoring", "academic_output", "reporting (export)"]
+        },
+        "subagent_equipo_2": {
+          "role": "Permisos, Acuerdos, Tesis y Evidencias",
+          "apps": ["identity (RBAC)", "agreements", "thesis", "evidence", "monitoring (alertas)"]
+        },
+        "subagent_equipo_3": {
+          "role": "Línea de Tiempo, Indicadores y Reportes Integrales",
+          "apps": ["monitoring (Dashboard)", "reporting (Full Dossier)", "shared/components (Timeline, App Shell)"]
+        }
       }
+    },
+    "sprint_1_frontend_infra_bootstrap": {
+      "required_files": [
+        "angular.json",
+        "package.json (script start: ng serve --port 4200)",
+        "tsconfig.json",
+        "tsconfig.app.json",
+        "proxy.conf.json (target: http://localhost:8000)"
+      ]
+    },
+    "scrum_protocol_and_artifacts": {
+      "target_directory": "/workspace/docs/sprints/sprint_{N}/scrum/",
+      "mandatory_artifacts": [
+        "sprint_planning.md",
+        "daily_scrum_log.md",
+        "scrum_of_scrums.md",
+        "sprint_review.md",
+        "sprint_retrospective.md",
+        "team_collaboration_log.md"
+      ]
     }
   },
-  "design_system_tokens": {
-    "palette": {
+  "environment": {
+    "frameworks": {
+      "backend": "Django 5.x / Django REST Framework 3.15+",
+      "frontend": "Angular 20 Standalone Signals",
+      "auth": "djangorestframework-simplejwt"
+    },
+    "workspaceRoot": "/workspace",
+    "requiredDirectories": [
+      "backend/apps/identity",
+      "backend/apps/students",
+      "backend/apps/tutoring",
+      "backend/apps/agreements",
+      "backend/apps/thesis",
+      "backend/apps/academic_output",
+      "backend/apps/evidence",
+      "backend/apps/monitoring",
+      "backend/apps/reporting",
+      "frontend/src/app/core",
+      "frontend/src/app/shared",
+      "frontend/src/app/features",
+      "docs/sprints",
+      "docs/post_mortem"
+    ]
+  },
+  "designSystem": {
+    "colors": {
       "primary": "#6365EF",
+      "primaryHover": "#4E50DC",
       "emphasis": "#2C1867",
-      "card_background": "#FFFFFF",
-      "app_background": "#F5F7FB",
-      "font_family": "Inter, sans-serif"
+      "surface": "#FFFFFF",
+      "background": "#F5F7FB",
+      "border": "#E4E7EC"
     },
-    "agreements_status_pill_badges": {
-      "PENDIENTE": {
-        "background": "#F6FCFE",
-        "text_border": "#57949D"
-      },
-      "EN_PROCESO": {
-        "background": "#FEF8F3",
-        "text_border": "#B57136"
-      },
-      "CONCLUIDO": {
-        "background": "#E9FEF1",
-        "text_border": "#437E5C"
-      },
-      "VENCIDO": {
-        "background": "#F8F1FF",
-        "text_border": "#A14D98"
-      }
-    },
-    "mandatory_layouts": [
-      "App Shell: Sidebar retraible + Top Navbar con breadcrumbs y selector de ciclo",
-      "Student Overview: Tabs de navegación longitudinal + Grid asimétrico 70/30",
-      "Tutoring Modal: Formulario en modal de 2 columnas estructurado por fases",
-      "Agreements Drawer: Panel lateral derecho deslizable para creación y actualización de acuerdos",
-      "Interactive Longitudinal Timeline: Línea temporal con flyout lateral y nodos por tipo (📘 Tutoría, 📝 Acuerdo, 📊 Tesis, 📎 Evidencia, 🎓 Producción)"
-    ]
-  },
-  "anti_scope_creep_rules": [
-    "RECHAZAR cualquier implementación de videollamadas o streaming en vivo.",
-    "RECHAZAR módulos de mensajería instantánea o salas de chat.",
-    "RECHAZAR sincronización o integración con Google Calendar, Outlook o iCal.",
-    "RECHAZAR mecanismos de firma electrónica avanzada o hashing criptográfico.",
-    "RECHAZAR pasarelas o envíos de notificaciones por WhatsApp, SMS o Email (restringido estrictamente a alertas internas en BD y UI)."
-  ],
-  "subagents_configuration": {
-    "team_1": {
-      "id": "nexus-subagent-team-1",
-      "role": "Equipo 1: Núcleo, Tutorías y Producción Académica",
-      "backend_apps": ["identity", "students", "tutoring", "academic_output"],
-      "frontend_features": ["auth", "students", "tutoring", "academic-output", "export"],
-      "responsibilities": [
-        "HU-01: Autenticación JWT y gestión de sesiones",
-        "HU-03: Registro y ficha de estudiantes de posgrado",
-        "HU-05: Gestión y estructura de semestres (1 a 6)",
-        "HU-07: Registro de sesiones de tutoría con campos obligatorios",
-        "HU-08: Modalidad y participantes de sesiones de tutoría",
-        "HU-10: Programación de reuniones futuras",
-        "HU-17 a HU-20: Registro de publicaciones (artículos, libros, capítulos) y ponencias en congresos/coloquios",
-        "HU-28: Motor de exportación a formatos Excel y PDF basado en reporte integral"
-      ]
-    },
-    "team_2": {
-      "id": "nexus-subagent-team-2",
-      "role": "Equipo 2: Acuerdos, Tesis y Evidencias",
-      "backend_apps": ["agreements", "thesis", "evidence"],
-      "frontend_features": ["agreements", "thesis", "evidence", "permissions"],
-      "responsibilities": [
-        "HU-02: Control de acceso por roles (RBAC: Estudiante, Asesor, Coordinador, Administrador)",
-        "HU-04: Asignación de comité académico (Asesor, Coasesor, Miembros del Comité)",
-        "HU-09: Registro detallado de observaciones y acuerdos derivados de tutorías",
-        "HU-11 a HU-13: Creación, asignación de fecha compromiso y transiciones de estado de acuerdos",
-        "HU-15 y HU-16: Registro y control del avance porcentual e hitos de la tesis doctoral",
-        "HU-21 y HU-22: Módulo de evidencias (carga de archivos físicos y registro de enlaces)",
-        "HU-26: Motor de alertas de seguimiento académico incompleto (sin tutoría o sin acuerdos)"
-      ]
-    },
-    "team_3": {
-      "id": "nexus-subagent-team-3",
-      "role": "Equipo 3: Seguimiento Longitudinal y Coordinación",
-      "backend_apps": ["monitoring", "reporting"],
-      "frontend_features": ["overview", "timeline", "dashboard", "reporting", "alerts"],
-      "responsibilities": [
-        "HU-06: Vista consolidada de Consulta de Expediente Estudiantil",
-        "HU-14: Bandeja y filtros de consulta de acuerdos pendientes y vencidos",
-        "HU-23: Línea de Tiempo Longitudinal interactiva con flyout drawer y nodos tipificados",
-        "HU-24: Dashboard Integral del Coordinador con métricas y avance de cohorte",
-        "HU-25: Sistema de alertas internas en UI para acuerdos próximos a vencer/vencidos",
-        "HU-27: Generador de Reporte Integral estructurado del estudiante",
-        "HU-29 y HU-30: Registro de estancias académicas/de investigación y productos de vinculación"
-      ]
+    "agreementBadgeTokens": {
+      "PENDIENTE": { "bg": "#F6FCFE", "text": "#57949D", "border": "#57949D" },
+      "EN_PROCESO": { "bg": "#FEF8F3", "text": "#B57136", "border": "#B57136" },
+      "CONCLUIDO": { "bg": "#E9FEF1", "text": "#437E5C", "border": "#437E5C" },
+      "VENCIDO": { "bg": "#F8F1FF", "text": "#A14D98", "border": "#A14D98" }
     }
   },
-  "definition_of_done": {
-    "backend_checklist": [
-      "Endpoints cumplen estrictamente REST V2 (kebab-case, trailing slash, snake_case payloads)",
-      "Respuestas de éxito (201/200) y error (400 con dict) respetan el esquema institucional",
-      "Migraciones ejecutadas y verificadas sin inconsistencias (makemigrations --check)",
-      "Protección por permisos y autenticación SimpleJWT en cada ViewSet/APIView",
-      "Compatibilidad SQLite/MySQL garantizada en modelos y queries ORM"
-    ],
-    "frontend_checklist": [
-      "Componentes Standalone de Angular 20, sin ngModules obsoletos",
-      "Manejo de estado y reactividad mediante Angular Signals",
-      "Plantillas estructuradas con Control Flow nativo (@if, @for, @switch)",
-      "Tokens de diseño aplicados: colores primarios, fondo app/cards, tipografía Inter",
-      "Pill Badges de acuerdos respetan la matriz de semáforos hexadecimales exactos",
-      "Diseño responsivo y componentes de layout implementados (Modal 2 col, Drawer derecho, Flyout Timeline)"
-    ],
-    "quality_assurance": [
-      "Pruebas unitarias y de integración pasando al 100%",
-      "Cero violaciones a las reglas anti scope-creep",
-      "Documentación técnica de sprint y HU registrada en /docs/sprints/"
-    ]
+  "negativeConstraints": [
+    "NO_LIVE_VIDEO_STREAMING",
+    "NO_INSTANT_MESSAGING_CHAT",
+    "NO_CALENDAR_SYNC_INTEGRATION",
+    "NO_CRYPTO_DIGITAL_SIGNATURES",
+    "NO_EXTERNAL_SMS_WHATSAPP_EMAIL_GATEWAYS"
+  ],
+  "apiSpecification": {
+    "version": "v2.0",
+    "caseStyle": {
+      "urls": "kebab-case",
+      "backendPayloads": "snake_case",
+      "frontendPayloads": "camelCase"
+    },
+    "trailingSlash": true,
+    "authHeader": "Authorization: Bearer <token>"
   }
 }

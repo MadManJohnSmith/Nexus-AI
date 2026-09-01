@@ -96,8 +96,8 @@ import { ThesisComponents } from '../../core/models/thesis.models';
               </div>
               <div class="comp-row">
                 <span class="comp-lbl">2. Estado del Arte y Marco Teórico:</span>
-                <input type="range" min="0" max="100" [(ngModel)]="componentes.estado_arte" class="mini-slider" />
-                <span class="comp-val">{{ componentes.estado_arte }}%</span>
+                <input type="range" min="0" max="100" [(ngModel)]="componentes.estadoArte" class="mini-slider" />
+                <span class="comp-val">{{ componentes.estadoArte }}%</span>
               </div>
               <div class="comp-row">
                 <span class="comp-lbl">3. Marco Metodológico y Algoritmos:</span>
