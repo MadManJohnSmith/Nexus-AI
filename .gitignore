@@ -17,3 +17,9 @@ npm_cache/
 .DS_Store
 .vscode/
 .idea/
+
+# Large media files
+*.mp4
+*.mov
+*.avi
+*.mkv
